@@ -4,13 +4,14 @@
 
 /**
  * ACP configuration page script.
- * Wrapped in require() for jQuery dependency.
- * Uses translator module for i18n (Fix 1).
+ * Uses the standard #save button provided by admin/partials/settings/header.tpl.
  */
-require(['jquery', 'translator'], function ($, translator) {
+define('admin/plugins/moderation-tools', ['jquery', 'translator'], function ($, translator) {
 	'use strict';
 
-	$(function () {
+	var ACP = {};
+
+	ACP.init = function () {
 		var $form = $('#moderation-tools-settings');
 
 		function collectSettings() {
@@ -33,9 +34,7 @@ require(['jquery', 'translator'], function ($, translator) {
 			};
 		}
 
-		$form.on('submit', function (e) {
-			e.preventDefault();
-
+		$('#save').on('click', function () {
 			var settings = collectSettings();
 
 			socket.emit('plugins.moderation-tools.saveSettings', settings, function (err) {
@@ -47,12 +46,13 @@ require(['jquery', 'translator'], function ($, translator) {
 				}
 
 				if (typeof app !== 'undefined' && app.alert) {
-					// Fix 1: Use translator module instead of [[...]] template syntax
 					translator.translate('[[moderation-tools:admin:save-success]]', function (translated) {
 						app.alertSuccess(translated);
 					});
 				}
 			});
 		});
-	});
+	};
+
+	return ACP;
 });

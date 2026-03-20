@@ -1,13 +1,12 @@
 /**
  * Moderation Tools - Frontend client module
  *
- * Fix 2: Wrapped in AMD define() per PRD section 4.1.
  * Loaded on all pages via filter:scripts.get hook.
  * Only initializes when the current page is /extra-tools/moderation-tools.
  * Uses action:ajaxify.end for ajax navigation support.
  *
- * Fix 1: Uses ajaxify.data.moderationToolsText (pre-translated by server)
- *         as fallback; also uses client-side translator module for robustness.
+ * Uses ajaxify.data.moderationToolsText (pre-translated by server)
+ * as fallback; also uses client-side translator module for robustness.
  */
 /* global ajaxify, config, app */
 define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator'], function ($, translator) {
@@ -17,11 +16,16 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 
 	/**
 	 * Safely parse JSON from a response, returning a fallback on failure.
-	 * Fix 7: Prevents SyntaxError when server returns non-JSON error pages.
+	 * Prevents SyntaxError when server returns non-JSON error pages.
+	 * Extracts message from NodeBB's formatApiResponse error structure:
+	 * { status: { code, message }, response: {} }
 	 */
 	async function safeParseJson(response, fallbackMsg) {
 		try {
-			return await response.json();
+			var json = await response.json();
+			// NodeBB formatApiResponse puts error message in status.message
+			var message = (json.status && json.status.message) || json.message || fallbackMsg;
+			return { message: message };
 		} catch (e) {
 			return { message: fallbackMsg || 'An unexpected error occurred.' };
 		}
@@ -49,7 +53,7 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 		var isSaving = false;
 		var hasChanges = false;
 
-		// Fix 1: Get pre-translated strings from server, with client-side translator fallback
+		// Get pre-translated strings from server, with client-side translator fallback
 		var text = (ajaxify.data && ajaxify.data.moderationToolsText) || {};
 		var pendingTranslations = {};
 
@@ -113,14 +117,16 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 				});
 
 				if (!response.ok) {
-					// Fix 7: Safe JSON parsing for error responses
+					// Safe JSON parsing for error responses
 					var error = await safeParseJson(response, fallbackMsg);
 					throw new Error(error.message || fallbackMsg);
 				}
 
 				var data = await response.json();
-				var category = data.category || {};
-				var categoryConfig = data.config || {};
+				// formatApiResponse wraps payload under 'response' key
+				var payload = data.response || {};
+				var category = payload.category || {};
+				var categoryConfig = payload.config || {};
 
 				// Update field visibility based on config
 				var enabledFields = categoryConfig.enabledFields || {};
@@ -159,6 +165,18 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 				// Populate form fields
 				populateForm(category);
 
+				// Filter parentCid dropdown to exclude current category
+				var $parentCidSelect = $('#mt-parentCid');
+				$parentCidSelect.find('option').each(function () {
+					var optionCid = parseInt($(this).val(), 10);
+					if (optionCid === cid) {
+						// Disable current category option
+						$(this).prop('disabled', true);
+					} else {
+						$(this).prop('disabled', false);
+					}
+				});
+
 				// Store original data for change detection
 				originalData = collectFormData();
 
@@ -177,6 +195,19 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 
 		// Populate form with category data
 		function populateForm(category) {
+			// Reset all fields to defaults first to prevent stale data
+			$form.find('[data-name]').each(function () {
+				var $el = $(this);
+				if ($el.is('input[type="checkbox"]')) {
+					$el.prop('checked', false);
+				} else if ($el.is('select')) {
+					$el.prop('selectedIndex', 0);
+				} else {
+					$el.val('');
+				}
+			});
+
+			// Then populate with actual category values
 			$form.find('[data-name]').each(function () {
 				var $el = $(this);
 				var name = $el.data('name');
@@ -188,12 +219,21 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 
 				if ($el.is('input[type="checkbox"]')) {
 					$el.prop('checked', !!parseInt(value, 10));
-				} else if ($el.is('input[type="color"]')) {
-					$el.val(value || '#000000');
 				} else if ($el.is('select')) {
 					$el.val(value);
 				} else {
 					$el.val(value);
+				}
+			});
+
+			// Sync color preview swatches with text input values
+			$form.find('.mt-color-preview').each(function () {
+				var targetId = $(this).data('target');
+				var val = $('#' + targetId).val();
+				if (val && /^#[0-9a-fA-F]{6}$/.test(val)) {
+					$(this).val(val);
+				} else {
+					$(this).val('#000000');
 				}
 			});
 		}
@@ -248,12 +288,11 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 
 			isSaving = true;
 
-			// Fix 1: Use pre-translated string for button text
 			var savingStr = text.saving || 'Saving...';
 			$saveBtn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i> ' + $('<span>').text(savingStr).html());
 
 			try {
-				// Fix 8: collectFormData() already skips hidden fields; no need for a second filter loop
+				// collectFormData() already skips hidden fields; no need for a second filter loop
 				var formData = collectFormData();
 
 				var fallbackMsg = text.saveFailed || 'Failed to save';
@@ -269,7 +308,7 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 				});
 
 				if (!response.ok) {
-					// Fix 7: Safe JSON parsing for error responses
+					// Safe JSON parsing for error responses
 					var error = await safeParseJson(response, fallbackMsg);
 					throw new Error(error.message || fallbackMsg);
 				}
@@ -279,7 +318,6 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 				hasChanges = false;
 				$saveBtn.removeClass('btn-warning').addClass('btn-primary');
 
-				// Fix 1: Use pre-translated success message
 				var successStr = text.saveSuccess || 'Category settings saved successfully.';
 				if (typeof app !== 'undefined' && app.alert) {
 					app.alertSuccess(successStr);
@@ -298,15 +336,23 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 				}
 			} finally {
 				isSaving = false;
-				// Fix 1: Use pre-translated save text for button restore
 				var saveStr = text.save || 'Save Changes';
 				$saveBtn.prop('disabled', false).html('<i class="fa fa-save me-1"></i> ' + $('<span>').text(saveStr).html());
 			}
 		}
 
-		// Event: category selector change
+		// Event: category selector change (with unsaved changes confirmation)
 		$cidSelect.on('change', function () {
-			currentCid = parseInt($(this).val(), 10) || null;
+			var newCid = parseInt($(this).val(), 10) || null;
+			if (hasChanges) {
+				var unsavedStr = text.unsavedChanges || 'You have unsaved changes. Are you sure you want to leave?';
+				if (!confirm(unsavedStr)) {
+					// Revert selector back to current cid
+					$cidSelect.val(currentCid);
+					return;
+				}
+			}
+			currentCid = newCid;
 			if (currentCid) {
 				loadCategoryData(currentCid);
 			}
@@ -324,8 +370,21 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 			checkChanges();
 		});
 
-		// Event: warn before leaving with unsaved changes (namespaced for cleanup)
-		// Fix 1 & Fix 13: Use pre-translated string, removed dead data-ajaxify check
+		// Color picker sync: color swatch updates text input and vice versa
+		$form.on('input change', '.mt-color-preview', function () {
+			var targetId = $(this).data('target');
+			var $textInput = $('#' + targetId);
+			$textInput.val($(this).val()).trigger('change');
+		});
+		$form.on('input change', '[data-name="bgColor"], [data-name="color"]', function () {
+			var val = $(this).val();
+			var $preview = $(this).closest('.d-flex').find('.mt-color-preview');
+			if (val && /^#[0-9a-fA-F]{6}$/.test(val)) {
+				$preview.val(val);
+			}
+		});
+
+		// Warn before leaving with unsaved changes (namespaced for cleanup)
 		$(window).off('beforeunload.moderationTools').on('beforeunload.moderationTools', function () {
 			if (hasChanges) {
 				var unsavedStr = text.unsavedChanges || 'You have unsaved changes.';
@@ -355,6 +414,9 @@ require(['jquery', 'nodebb-plugin-moderation-tools/moderation-tools'], function 
 	$(window).on('action:ajaxify.end.moderationTools', function () {
 		if (typeof ajaxify !== 'undefined' && ajaxify.currentPage === 'extra-tools/moderation-tools') {
 			ModerationTools.init();
+		} else {
+			// Clean up beforeunload listener when navigating away from the page
+			$(window).off('beforeunload.moderationTools');
 		}
 	});
 

@@ -153,6 +153,31 @@ Plugin.validateNumericField = function (field, value) {
 };
 
 /**
+ * Escape a string for safe insertion into HTML.
+ * Prevents XSS when building HTML strings in widget rendering.
+ * @param {string} str
+ * @returns {string}
+ */
+Plugin.escapeHtml = function (str) {
+	if (typeof str !== 'string') {
+		return '';
+	}
+	return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+};
+
+/**
+ * Validate CSS class names (alphanumeric, hyphens, underscores, spaces only)
+ * @param {string} classStr
+ * @returns {boolean}
+ */
+Plugin.isValidCssClass = function (classStr) {
+	if (!classStr || typeof classStr !== 'string') {
+		return true; // empty is ok
+	}
+	return /^[\w\s-]+$/.test(classStr);
+};
+
+/**
  * Log error internally and return a safe error object for the API response
  * @param {Error} err - original error
  * @param {string} fallbackKey - i18n key for the generic message
@@ -330,8 +355,12 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 				}
 			}
 
-			// Fix 10: parentCid existence validation
+			// Fix 10: parentCid existence and self-reference validation
 			if (updateData.hasOwnProperty('parentCid') && updateData.parentCid > 0) {
+				// Security: prevent circular self-reference
+				if (parseInt(updateData.parentCid, 10) === cid) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data, parentCid cannot reference itself]]'));
+				}
 				const parentExists = await categories.getCategoryData(parseInt(updateData.parentCid, 10));
 				if (!parentExists || !parentExists.cid) {
 					return helpers.formatApiResponse(400, res, new Error('[[error:category-not-found, parent]]'));
@@ -358,9 +387,11 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 				}
 			}
 
-			// Fix 12: minTags should not exceed maxTags
-			if (updateData.hasOwnProperty('minTags') && updateData.hasOwnProperty('maxTags')) {
-				if (updateData.minTags > updateData.maxTags) {
+			// Fix 12: minTags should not exceed maxTags (cross-validate against existing values too)
+			if (updateData.hasOwnProperty('minTags') || updateData.hasOwnProperty('maxTags')) {
+				const effectiveMin = updateData.hasOwnProperty('minTags') ? updateData.minTags : (parseInt(existingCategory.minTags, 10) || 0);
+				const effectiveMax = updateData.hasOwnProperty('maxTags') ? updateData.maxTags : (parseInt(existingCategory.maxTags, 10) || 0);
+				if (effectiveMax > 0 && effectiveMin > effectiveMax) {
 					return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data, minTags must not exceed maxTags]]'));
 				}
 			}
@@ -372,7 +403,32 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 				}
 			}
 
+			// Security: Validate backgroundImage as valid URL (prevent javascript: / data: URI injection)
+			if (updateData.hasOwnProperty('backgroundImage')) {
+				if (!Plugin.isValidUrl(updateData.backgroundImage)) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data, backgroundImage must be a valid URL]]'));
+				}
+			}
+
+			// Security: Validate class field to prevent CSS injection
+			if (updateData.hasOwnProperty('class')) {
+				if (!Plugin.isValidCssClass(updateData.class)) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data, class must contain only alphanumeric characters, spaces, hyphens, and underscores]]'));
+				}
+			}
+
+			// Security: Whitelist-validate imageClass to prevent arbitrary value injection
+			if (updateData.hasOwnProperty('imageClass')) {
+				const validImageClasses = ['auto', 'cover', 'contain'];
+				if (updateData.imageClass && !validImageClasses.includes(updateData.imageClass)) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data, imageClass must be one of: auto, cover, contain]]'));
+				}
+			}
+
 			// Save using NodeBB's built-in categories.update
+			if (Object.keys(updateData).length === 0) {
+				return helpers.formatApiResponse(200, res, { cid: cid, updated: [] });
+			}
 			await categories.update({ [cid]: updateData });
 
 			helpers.formatApiResponse(200, res, { cid: cid, updated: Object.keys(updateData) });
@@ -381,7 +437,7 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 		}
 	});
 
-	// Fix 3: Get plugin config - requires admin or moderator privileges
+	// Get plugin config - requires admin or moderator privileges
 	routeHelpers.setupApiRoute(router, 'get', '/extra-tools/moderation-tools/config', apiMiddleware, async (req, res) => {
 		try {
 			const uid = req.uid;
@@ -405,11 +461,14 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
  * Render the frontend moderation tools page
  */
 Plugin.renderModerationPage = async function (req, res, next) {
+	try {
 	const uid = req.uid;
 
-	// Check if user has any moderation privileges
-	const isAdmin = await user.isAdministrator(uid);
-	const isGlobalMod = await user.isGlobalModerator(uid);
+	// Check if user has any moderation privileges (parallelize independent queries)
+	const [isAdmin, isGlobalMod] = await Promise.all([
+		user.isAdministrator(uid),
+		user.isGlobalModerator(uid),
+	]);
 
 	if (!isAdmin && !isGlobalMod) {
 		const isMod = await user.isModeratorOfAnyCategory(uid);
@@ -418,11 +477,14 @@ Plugin.renderModerationPage = async function (req, res, next) {
 		}
 	}
 
-	// Get config
-	const config = await Plugin.getConfig();
+	// Parallelize independent data fetches
+	const [pluginConfig, userSettings] = await Promise.all([
+		Plugin.getConfig(),
+		user.getSettings(uid),
+	]);
+	const config = pluginConfig;
 
-	// Fix 1: Translate strings for JS use and pass via ajaxify.data
-	const userSettings = await user.getSettings(uid);
+	// Translate strings for JS use and pass via ajaxify.data
 	const userLang = userSettings.userLang || meta.config.defaultLang || 'en-GB';
 	const t = new translator(userLang);
 	const [saveText, savingText, saveSuccessText, unsavedChangesText, loadFailedText, saveFailedText] = await Promise.all([
@@ -474,7 +536,7 @@ Plugin.renderModerationPage = async function (req, res, next) {
 		config: config,
 		isAdmin: isAdmin,
 		isGlobalMod: isGlobalMod,
-		// Fix 1: Pass translated strings for client-side JS
+		// Pass translated strings for client-side JS
 		moderationToolsText: {
 			save: saveText,
 			saving: savingText,
@@ -484,12 +546,17 @@ Plugin.renderModerationPage = async function (req, res, next) {
 			saveFailed: saveFailedText,
 		},
 	});
+	} catch (err) {
+		winston.error('[plugins/moderation-tools] renderModerationPage error: ' + (err.stack || err.message));
+		return next(err);
+	}
 };
 
 /**
  * Render the ACP configuration page
  */
-Plugin.renderAdminPage = async function (req, res) {
+Plugin.renderAdminPage = async function (req, res, next) {
+	try {
 	const config = await Plugin.getConfig();
 
 	res.render('admin/moderation-tools', {
@@ -499,34 +566,44 @@ Plugin.renderAdminPage = async function (req, res) {
 		enabledFields: config.enabledFields,
 		enabledSidebarActions: config.enabledSidebarActions,
 	});
+	} catch (err) {
+		winston.error('[plugins/moderation-tools] renderAdminPage error: ' + (err.stack || err.message));
+		return next(err);
+	}
 };
 
 /**
  * Add admin navigation menu item
  */
-Plugin.addAdminNavigation = function (header, callback) {
+Plugin.addAdminNavigation = async function (header) {
 	header.plugins.push({
 		route: '/plugins/moderation-tools',
 		icon: 'fa-wrench',
 		name: '[[moderation-tools:admin:title]]',
 	});
 
-	callback(null, header);
+	return header;
 };
 
 /**
  * Inject moderation tool data into all rendered pages via filter:middleware.render
  */
 Plugin.addMiddlewareData = async function (data) {
-	const uid = data.req.uid;
-	if (uid > 0) {
-		const isAdmin = await user.isAdministrator(uid);
-		const isGlobalMod = await user.isGlobalModerator(uid);
-		const isModerator = isAdmin || isGlobalMod || await user.isModeratorOfAnyCategory(uid);
+	try {
+		const uid = data.req.uid;
+		if (uid > 0) {
+			const [isAdmin, isGlobalMod] = await Promise.all([
+				user.isAdministrator(uid),
+				user.isGlobalModerator(uid),
+			]);
+			const isModerator = isAdmin || isGlobalMod || await user.isModeratorOfAnyCategory(uid);
 
-		if (isModerator) {
-			data.templateData.moderationToolsUserCanModerate = true;
+			if (isModerator) {
+				data.templateData.moderationToolsUserCanModerate = true;
+			}
 		}
+	} catch (err) {
+		winston.warn('[plugins/moderation-tools] addMiddlewareData error: ' + (err.message || err));
 	}
 
 	return data;
@@ -548,8 +625,20 @@ Plugin.socketSaveSettings = async function (socket, data) {
 		throw new Error('[[error:no-privileges]]');
 	}
 
-	const enabledFields = data.enabledFields || Plugin.defaultConfig.enabledFields;
-	const enabledSidebarActions = data.enabledSidebarActions || Plugin.defaultConfig.enabledSidebarActions;
+	// Security: Validate data parameter is a valid object
+	if (!data || typeof data !== 'object') {
+		throw new Error('[[error:invalid-data]]');
+	}
+
+	// Security: Validate input shape - only allow known fields with boolean values
+	const enabledFields = {};
+	for (const field of Plugin.allFields) {
+		enabledFields[field] = !!(data.enabledFields && data.enabledFields[field]);
+	}
+	const enabledSidebarActions = {};
+	for (const action of Plugin.sidebarActions) {
+		enabledSidebarActions[action] = !!(data.enabledSidebarActions && data.enabledSidebarActions[action]);
+	}
 
 	await meta.settings.set('moderation-tools', {
 		enabledFields: JSON.stringify(enabledFields),
@@ -593,13 +682,23 @@ Plugin.renderWidget = async function (data) {
 	if (data.templateData) {
 		cid = data.templateData.cid || (data.templateData.category && data.templateData.category.cid);
 	}
+	// Security: ensure cid is numeric to prevent XSS via template data injection
+	if (cid) {
+		cid = parseInt(cid, 10);
+		if (isNaN(cid) || cid <= 0) {
+			cid = null;
+		}
+	}
+
+	// Security: HTML-encode label to prevent XSS from translation strings
+	const safeLabel = Plugin.escapeHtml(label);
 
 	if (isAdmin || isGlobalMod) {
 		let href = `${nconf.get('relative_path')}/extra-tools/moderation-tools`;
 		if (cid) {
 			href += `?cid=${cid}`;
 		}
-		data.html = `<a href="${href}" class="btn btn-outline-primary btn-block">${label}</a>`;
+		data.html = `<a href="${href}" class="btn btn-outline-primary btn-block">${safeLabel}</a>`;
 		return data;
 	}
 
@@ -622,7 +721,7 @@ Plugin.renderWidget = async function (data) {
 		href += `?cid=${cid}`;
 	}
 
-	data.html = `<a href="${href}" class="btn btn-outline-primary btn-block">${label}</a>`;
+	data.html = `<a href="${href}" class="btn btn-outline-primary btn-block">${safeLabel}</a>`;
 	return data;
 };
 

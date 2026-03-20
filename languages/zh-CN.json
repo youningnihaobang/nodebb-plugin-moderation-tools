@@ -25,6 +25,7 @@
 		"minTags": "最少标签数",
 		"maxTags": "最多标签数",
 		"tagWhitelist": "标签白名单",
+		"tagWhitelist-help": "用逗号分隔的允许标签列表（如：新闻,讨论,帮助）。",
 		"link": "外部链接",
 		"isSection": "章节模式",
 		"postQueue": "帖子审核队列",
@@ -32,7 +33,9 @@
 		"bgColor": "背景颜色",
 		"color": "文字颜色",
 		"imageClass": "背景图片尺寸",
-		"class": "自定义样式类"
+		"class": "自定义样式类",
+		"min-label": "最小",
+		"max-label": "最大"
 	},
 
 	"sidebar-actions": {

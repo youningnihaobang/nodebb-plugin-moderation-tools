@@ -25,6 +25,7 @@
 		"minTags": "Minimum Tags",
 		"maxTags": "Maximum Tags",
 		"tagWhitelist": "Tag Whitelist",
+		"tagWhitelist-help": "Comma-separated list of allowed tags (e.g., news,discussion,help).",
 		"link": "External Link",
 		"isSection": "Section Mode",
 		"postQueue": "Post Queue",
@@ -32,7 +33,9 @@
 		"bgColor": "Background Color",
 		"color": "Text Color",
 		"imageClass": "Background Image Size",
-		"class": "Custom CSS Class"
+		"class": "Custom CSS Class",
+		"min-label": "Min",
+		"max-label": "Max"
 	},
 
 	"sidebar-actions": {

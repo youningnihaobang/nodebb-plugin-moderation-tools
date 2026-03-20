@@ -1,4 +1,15 @@
 <div class="moderation-tools" id="moderation-tools">
+	<!-- Breadcrumb -->
+	{{{ if breadcrumb.length }}}
+	<ol class="breadcrumb mb-3">
+		{{{ each breadcrumb }}}
+		<li class="breadcrumb-item {{{ if @last }}}active{{{ end }}}">
+			{{{ if ./href }}}<a href="{./href}">{./text}</a>{{{ else }}}{./text}{{{ end }}}
+		</li>
+		{{{ end }}}
+	</ol>
+	{{{ end }}}
+
 	<!-- Sticky Header -->
 	<div class="moderation-tools-header sticky-top bg-body border-bottom py-2 px-3 mb-3">
 		<div class="row align-items-center">
@@ -39,8 +50,8 @@
 		<p class="text-muted">[[moderation-tools:no-categories-help]]</p>
 	</div>
 
-	<!-- Main Content -->
-	<div class="row" id="moderation-tools-content" {{{ if !categories.length }}}hidden{{{ end }}}>
+	<!-- Main Content (use class-based hidden for consistency with JS addClass/removeClass) -->
+	<div class="row {{{ if !categories.length }}}hidden{{{ end }}}" id="moderation-tools-content">
 		<!-- Left: Form -->
 		<div class="col-12 col-md-8">
 			<div id="moderation-tools-loading" class="text-center py-5">
@@ -105,11 +116,11 @@
 					<label class="form-label">[[moderation-tools:fields:minTags]] / [[moderation-tools:fields:maxTags]]</label>
 					<div class="d-flex gap-3 align-items-center">
 						<div class="d-flex gap-1 align-items-center">
-							<label for="mt-minTags" class="form-label mb-0">[[admin/admin:min]]</label>
+							<label for="mt-minTags" class="form-label mb-0">[[moderation-tools:fields:min-label]]</label>
 							<input id="mt-minTags" type="number" class="form-control mt-min-tags-field" data-name="minTags" min="0" style="max-width: 80px;" />
 						</div>
 						<div class="d-flex gap-1 align-items-center">
-							<label for="mt-maxTags" class="form-label mb-0">[[admin/admin:max]]</label>
+							<label for="mt-maxTags" class="form-label mb-0">[[moderation-tools:fields:max-label]]</label>
 							<input id="mt-maxTags" type="number" class="form-control mt-max-tags-field" data-name="maxTags" min="0" style="max-width: 80px;" />
 						</div>
 					</div>
@@ -119,6 +130,7 @@
 					<div class="mb-3 moderation-tools-field" data-field="tagWhitelist">
 						<label class="form-label" for="mt-tagWhitelist">[[moderation-tools:fields:tagWhitelist]]</label>
 						<input id="mt-tagWhitelist" type="text" class="form-control" data-name="tagWhitelist" />
+						<p class="form-text">[[moderation-tools:fields:tagWhitelist-help]]</p>
 					</div>
 
 					<!-- External Link -->
@@ -154,13 +166,19 @@
 					<!-- Background Color -->
 					<div class="mb-3 moderation-tools-field" data-field="bgColor">
 						<label class="form-label" for="mt-bgColor">[[moderation-tools:fields:bgColor]]</label>
-						<input type="color" id="mt-bgColor" data-name="bgColor" class="form-control p-1" style="max-width: 80px; height: 40px;" />
+						<div class="d-flex gap-2 align-items-center" style="max-width: 200px;">
+							<input type="text" id="mt-bgColor" data-name="bgColor" class="form-control" placeholder="#ffffff" pattern="^#[0-9a-fA-F]{6}$" />
+							<input type="color" class="form-control form-control-color p-1 mt-color-preview" style="min-width: 40px; height: 38px;" data-target="mt-bgColor" />
+						</div>
 					</div>
 
 					<!-- Text Color -->
 					<div class="mb-3 moderation-tools-field" data-field="color">
 						<label class="form-label" for="mt-color">[[moderation-tools:fields:color]]</label>
-						<input type="color" id="mt-color" data-name="color" class="form-control p-1" style="max-width: 80px; height: 40px;" />
+						<div class="d-flex gap-2 align-items-center" style="max-width: 200px;">
+							<input type="text" id="mt-color" data-name="color" class="form-control" placeholder="#ffffff" pattern="^#[0-9a-fA-F]{6}$" />
+							<input type="color" class="form-control form-control-color p-1 mt-color-preview" style="min-width: 40px; height: 38px;" data-target="mt-color" />
+						</div>
 					</div>
 
 					<!-- Image Class -->
@@ -182,25 +200,21 @@
 			</div>
 		</div>
 
-		<!-- Right: Sidebar -->
+		<!-- Right: Sidebar (always rendered, JS controls visibility) -->
 		<div class="col-12 col-md-4">
 			<div class="moderation-tools-sidebar">
 				<div class="card">
 					<div class="card-body p-0">
 						<div class="list-group list-group-flush">
-							{{{ if config.enabledSidebarActions.viewCategory }}}
-							<a id="mt-sidebar-view" href="#" class="list-group-item list-group-item-action d-flex gap-2 align-items-center">
+							<a id="mt-sidebar-view" href="#" class="list-group-item list-group-item-action d-flex gap-2 align-items-center hidden">
 								<i class="fa fa-eye text-primary"></i>
 								[[moderation-tools:sidebar-actions:viewCategory]]
 							</a>
-							{{{ end }}}
 
-							{{{ if config.enabledSidebarActions.analytics }}}
-							<a id="mt-sidebar-analytics" href="#" class="list-group-item list-group-item-action d-flex gap-2 align-items-center">
+							<a id="mt-sidebar-analytics" href="#" class="list-group-item list-group-item-action d-flex gap-2 align-items-center hidden">
 								<i class="fa fa-chart-simple text-primary"></i>
 								[[moderation-tools:sidebar-actions:analytics]]
 							</a>
-							{{{ end }}}
 						</div>
 					</div>
 				</div>
