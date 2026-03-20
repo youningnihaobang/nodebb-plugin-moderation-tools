@@ -1,0 +1,60 @@
+{
+	"page-title": "Moderation Tools",
+	"select-category": "Select Category",
+	"save": "Save Changes",
+	"saving": "Saving...",
+	"save-success": "Category settings saved successfully.",
+	"no-categories": "No Categories Available",
+	"no-categories-help": "You don't have moderation permissions for any category. Please contact an administrator.",
+	"loading": "Loading category data...",
+	"unsaved-changes": "You have unsaved changes. Are you sure you want to leave?",
+	"no-parent": "None (Top Level)",
+
+	"fields": {
+		"name": "Category Name",
+		"handle": "Category Handle",
+		"handle-help": "A URL-friendly unique identifier for the category.",
+		"description": "Description",
+		"topicTemplate": "Topic Template",
+		"topicTemplate-help": "Content to pre-fill when creating a new topic in this category.",
+		"parentCid": "Parent Category",
+		"numRecentReplies": "Recent Replies",
+		"subCategoriesPerPage": "Sub-categories Per Page",
+		"minTags": "Minimum Tags",
+		"maxTags": "Maximum Tags",
+		"tagWhitelist": "Tag Whitelist",
+		"link": "External Link",
+		"isSection": "Section Mode",
+		"postQueue": "Post Queue",
+		"backgroundImage": "Background Image",
+		"bgColor": "Background Color",
+		"color": "Text Color",
+		"imageClass": "Background Image Size",
+		"class": "Custom CSS Class"
+	},
+
+	"sidebar-actions": {
+		"viewCategory": "View Category",
+		"analytics": "Analytics"
+	},
+
+	"admin": {
+		"title": "Moderation Tools",
+		"description": "Configure which category fields moderators can manage from the frontend moderation tools page.",
+		"fields-title": "Manageable Fields",
+		"fields-help": "Select the fields that moderators can edit in the moderation tools page. Unselected fields will be hidden and cannot be modified by moderators.",
+		"sidebar-title": "Sidebar Actions",
+		"sidebar-help": "Select the actions to display in the sidebar of the moderation tools page.",
+		"policy-title": "Permission Policy",
+		"policy-uniform": "All configurations apply uniformly to all moderator roles (administrators, global moderators, moderators).",
+		"policy-no-per-user": "Per-user or per-category configuration is not supported to keep settings simple.",
+		"policy-instant": "Configuration changes take effect immediately without requiring a restart.",
+		"save-success": "Moderation tools settings saved successfully."
+	},
+
+	"widget": {
+		"name": "Moderation Tools Link",
+		"description": "Displays a link to the moderation tools page, visible only to users with moderation permissions.",
+		"label": "Moderation Tools"
+	}
+}

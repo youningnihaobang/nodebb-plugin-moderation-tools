@@ -1,0 +1,84 @@
+/* moderation-tools.scss - Styles for the NodeBB Moderation Tools plugin */
+/* Namespaced under #moderation-tools to avoid conflicts */
+
+#moderation-tools {
+	.moderation-tools-header {
+		z-index: 1000;
+		background-color: var(--bs-body-bg, #fff);
+
+		.btn-warning {
+			animation: pulse-warning 2s ease-in-out infinite;
+		}
+	}
+
+	.moderation-tools-category-selector {
+		max-width: 400px;
+	}
+
+	.moderation-tools-form {
+		.form-label {
+			font-weight: 600;
+			font-size: 0.9rem;
+		}
+
+		.form-text {
+			font-size: 0.8rem;
+		}
+
+		input[type="color"] {
+			cursor: pointer;
+		}
+
+		hr {
+			margin: 1.5rem 0;
+		}
+	}
+
+	.moderation-tools-sidebar {
+		.card {
+			position: sticky;
+			top: 70px;
+		}
+
+		.list-group-item {
+			padding: 0.6rem 1rem;
+			font-size: 0.9rem;
+
+			i {
+				width: 20px;
+				text-align: center;
+			}
+
+			&:hover {
+				background-color: var(--bs-light, #f8f9fa);
+			}
+		}
+	}
+
+	.moderation-tools-empty {
+		i {
+			opacity: 0.5;
+		}
+	}
+
+	/* Responsive adjustments */
+	@media (max-width: 767.98px) {
+		.moderation-tools-sidebar {
+			margin-top: 1rem;
+
+			.card {
+				position: static;
+			}
+		}
+	}
+}
+
+/* Pulse animation for save button when there are unsaved changes */
+@keyframes pulse-warning {
+	0%, 100% {
+		box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+	}
+	50% {
+		box-shadow: 0 0 0 6px rgba(255, 193, 7, 0);
+	}
+}

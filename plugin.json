@@ -1,0 +1,24 @@
+{
+  "id": "nodebb-plugin-moderation-tools",
+  "url": "",
+  "library": "./library.js",
+  "hooks": [
+    { "hook": "static:app.load", "method": "init" },
+    { "hook": "static:api.routes", "method": "addApiRoutes" },
+    { "hook": "filter:admin.header.build", "method": "addAdminNavigation" },
+    { "hook": "filter:widgets.getWidgets", "method": "defineWidget" },
+    { "hook": "filter:widget.render:moderation-tools-link", "method": "renderWidget" }
+  ],
+  "staticDirs": {
+    "static": "./public"
+  },
+  "scss": [
+    "public/scss/moderation-tools.scss"
+  ],
+  "modules": {
+    "../admin/plugins/moderation-tools.js": "./public/js/admin.js"
+  },
+  "templates": "templates",
+  "languages": "languages",
+  "defaultLang": "en-GB"
+}

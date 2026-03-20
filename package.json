@@ -1,0 +1,24 @@
+{
+  "name": "nodebb-plugin-moderation-tools",
+  "version": "1.0.0",
+  "description": "Moderation tools plugin for NodeBB - allows moderators to manage categories from the frontend",
+  "main": "library.js",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "keywords": [
+    "nodebb",
+    "plugin",
+    "moderation",
+    "category",
+    "management"
+  ],
+  "author": {
+    "name": ""
+  },
+  "license": "MIT",
+  "nbbpm": {
+    "compatibility": "^4.0.0"
+  }
+}
