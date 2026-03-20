@@ -6,6 +6,8 @@
     { "hook": "static:app.load", "method": "init" },
     { "hook": "static:api.routes", "method": "addApiRoutes" },
     { "hook": "filter:admin.header.build", "method": "addAdminNavigation" },
+    { "hook": "filter:middleware.render", "method": "addMiddlewareData" },
+    { "hook": "filter:scripts.get", "method": "addScripts" },
     { "hook": "filter:widgets.getWidgets", "method": "defineWidget" },
     { "hook": "filter:widget.render:moderation-tools-link", "method": "renderWidget" }
   ],

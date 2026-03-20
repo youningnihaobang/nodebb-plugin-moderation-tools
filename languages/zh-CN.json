@@ -8,6 +8,8 @@
 	"no-categories-help": "您没有任何版块的管理权限。请联系管理员。",
 	"loading": "正在加载版块数据...",
 	"unsaved-changes": "您有未保存的更改，确定要离开吗？",
+	"load-failed": "加载版块数据失败。",
+	"save-failed": "保存版块设置失败。",
 	"no-parent": "无（顶级版块）",
 
 	"fields": {

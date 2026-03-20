@@ -24,6 +24,15 @@ Plugin.allFields = [
 // Sidebar actions available
 Plugin.sidebarActions = ['viewCategory', 'analytics'];
 
+// Validation limits for numeric fields
+Plugin.numericFieldLimits = {
+	numRecentReplies: { max: 100, min: 0 },
+	subCategoriesPerPage: { max: 50, min: 0 },
+	minTags: { max: 100, min: 0 },
+	maxTags: { max: 100, min: 0 },
+	parentCid: { min: 0 },
+};
+
 // Default configuration
 Plugin.defaultConfig = {
 	enabledFields: {
@@ -85,7 +94,77 @@ Plugin.getConfig = async function () {
 };
 
 /**
- * Initialize plugin - register routes
+ * Validate cid parameter
+ * @param {string|number} cid
+ * @returns {number|null} parsed cid or null if invalid
+ */
+Plugin.validateCid = function (cid) {
+	const parsed = parseInt(cid, 10);
+	if (isNaN(parsed) || parsed <= 0) {
+		return null;
+	}
+	return parsed;
+};
+
+/**
+ * Validate handle format (URL-safe: alphanumeric, hyphens, underscores)
+ * @param {string} handle
+ * @returns {boolean}
+ */
+Plugin.isValidHandle = function (handle) {
+	return typeof handle === 'string' && /^[\w-]+$/.test(handle);
+};
+
+/**
+ * Validate URL format
+ * @param {string} url
+ * @returns {boolean}
+ */
+Plugin.isValidUrl = function (url) {
+	if (!url || typeof url !== 'string') {
+		return true; // empty is ok, will be cleared
+	}
+	try {
+		const parsed = new URL(url);
+		return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+	} catch (e) {
+		return false;
+	}
+};
+
+/**
+ * Validate numeric field value against defined limits
+ * @param {string} field
+ * @param {number} value
+ * @returns {{ valid: boolean, message: string|null }}
+ */
+Plugin.validateNumericField = function (field, value) {
+	const limits = Plugin.numericFieldLimits[field];
+	if (!limits) {
+		return { valid: true, message: null };
+	}
+	if (value < limits.min) {
+		return { valid: false, message: `[[error:invalid-data, ${field} must be >= ${limits.min}]]` };
+	}
+	if (limits.max !== undefined && value > limits.max) {
+		return { valid: false, message: `[[error:invalid-data, ${field} must be <= ${limits.max}]]` };
+	}
+	return { valid: true, message: null };
+};
+
+/**
+ * Log error internally and return a safe error object for the API response
+ * @param {Error} err - original error
+ * @param {string} fallbackKey - i18n key for the generic message
+ * @returns {Error}
+ */
+Plugin.safeApiError = function (err, fallbackKey) {
+	winston.error('[plugins/moderation-tools] ' + (err.stack || err.message));
+	return new Error(fallbackKey || '[[error:internal-server-error]]');
+};
+
+/**
+ * Initialize plugin - register routes and socket methods
  */
 Plugin.init = async function (params) {
 	const { router, middleware } = params;
@@ -115,6 +194,7 @@ Plugin.init = async function (params) {
 
 /**
  * Register API routes
+ * Routes are mounted under /api/v3/plugins/ via static:api.routes hook
  */
 Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 	const apiMiddleware = [middleware.ensureLoggedIn];
@@ -139,14 +219,19 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 
 			helpers.formatApiResponse(200, res, { categories: validCategories });
 		} catch (err) {
-			helpers.formatApiResponse(500, res, new Error(err.message));
+			helpers.formatApiResponse(500, res, Plugin.safeApiError(err));
 		}
 	});
 
 	// Get category data for editing (only authorized fields)
 	routeHelpers.setupApiRoute(router, 'get', '/extra-tools/moderation-tools/category/:cid', apiMiddleware, async (req, res) => {
 		try {
-			const cid = parseInt(req.params.cid, 10);
+			// Fix 9: Validate cid parameter
+			const cid = Plugin.validateCid(req.params.cid);
+			if (!cid) {
+				return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data]]'));
+			}
+
 			const uid = req.uid;
 
 			// Verify user has moderate privilege for this category
@@ -157,7 +242,7 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 
 			// Get full category data
 			const categoryData = await categories.getCategoryData(cid);
-			if (!categoryData) {
+			if (!categoryData || !categoryData.cid) {
 				return helpers.formatApiResponse(404, res, new Error('[[error:category-not-found]]'));
 			}
 
@@ -176,7 +261,6 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			filteredData.name = categoryData.name; // Always include name for display
 			filteredData.icon = categoryData.icon; // Always include icon for display
 
-			// Also return config info
 			helpers.formatApiResponse(200, res, {
 				category: filteredData,
 				config: {
@@ -185,14 +269,19 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 				},
 			});
 		} catch (err) {
-			helpers.formatApiResponse(500, res, new Error(err.message));
+			helpers.formatApiResponse(500, res, Plugin.safeApiError(err));
 		}
 	});
 
 	// Save category data (only authorized fields)
 	routeHelpers.setupApiRoute(router, 'put', '/extra-tools/moderation-tools/category/:cid', apiMiddleware, async (req, res) => {
 		try {
-			const cid = parseInt(req.params.cid, 10);
+			// Fix 9: Validate cid parameter
+			const cid = Plugin.validateCid(req.params.cid);
+			if (!cid) {
+				return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data]]'));
+			}
+
 			const uid = req.uid;
 
 			// Verify user has moderate privilege for this category
@@ -202,8 +291,8 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			}
 
 			// Verify category exists
-			const exists = await categories.exists(cid);
-			if (!exists) {
+			const existingCategory = await categories.getCategoryData(cid);
+			if (!existingCategory || !existingCategory.cid) {
 				return helpers.formatApiResponse(404, res, new Error('[[error:category-not-found]]'));
 			}
 
@@ -220,8 +309,33 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			}
 
 			// Validate required fields
-			if (enabledFields.name && (!updateData.name || !updateData.name.toString().trim())) {
-				return helpers.formatApiResponse(400, res, new Error('[[error:category-name-required]]'));
+			if (enabledFields.name && updateData.hasOwnProperty('name')) {
+				if (!updateData.name || !updateData.name.toString().trim()) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:category-name-required]]'));
+				}
+			}
+
+			// Fix 4: Handle format and uniqueness validation
+			if (updateData.hasOwnProperty('handle') && updateData.handle) {
+				if (!Plugin.isValidHandle(updateData.handle)) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:invalid-handle]]'));
+				}
+				const handleTaken = await categories.existsByHandle(updateData.handle);
+				if (handleTaken) {
+					// existsByHandle returns true if ANY category uses this handle
+					const existingHandle = await categories.getCategoryField(cid, 'handle');
+					if (existingHandle !== updateData.handle) {
+						return helpers.formatApiResponse(400, res, new Error('[[error:category-handle-already-exists]]'));
+					}
+				}
+			}
+
+			// Fix 10: parentCid existence validation
+			if (updateData.hasOwnProperty('parentCid') && updateData.parentCid > 0) {
+				const parentExists = await categories.getCategoryData(parseInt(updateData.parentCid, 10));
+				if (!parentExists || !parentExists.cid) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:category-not-found, parent]]'));
+				}
 			}
 
 			// Handle boolean fields
@@ -232,11 +346,29 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 				}
 			}
 
-			// Handle numeric fields
+			// Handle numeric fields with validation (Fix 6: upper limits)
 			const numFields = ['numRecentReplies', 'subCategoriesPerPage', 'minTags', 'maxTags', 'parentCid'];
 			for (const field of numFields) {
 				if (updateData.hasOwnProperty(field)) {
 					updateData[field] = parseInt(updateData[field], 10) || 0;
+					const validation = Plugin.validateNumericField(field, updateData[field]);
+					if (!validation.valid) {
+						return helpers.formatApiResponse(400, res, new Error(validation.message));
+					}
+				}
+			}
+
+			// Fix 12: minTags should not exceed maxTags
+			if (updateData.hasOwnProperty('minTags') && updateData.hasOwnProperty('maxTags')) {
+				if (updateData.minTags > updateData.maxTags) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data, minTags must not exceed maxTags]]'));
+				}
+			}
+
+			// Fix 11: Validate link field as valid URL
+			if (updateData.hasOwnProperty('link')) {
+				if (!Plugin.isValidUrl(updateData.link)) {
+					return helpers.formatApiResponse(400, res, new Error('[[error:invalid-data, link must be a valid URL]]'));
 				}
 			}
 
@@ -245,17 +377,26 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 
 			helpers.formatApiResponse(200, res, { cid: cid, updated: Object.keys(updateData) });
 		} catch (err) {
-			helpers.formatApiResponse(500, res, new Error(err.message));
+			helpers.formatApiResponse(500, res, Plugin.safeApiError(err));
 		}
 	});
 
-	// Get plugin config (for frontend use)
+	// Fix 3: Get plugin config - requires admin or moderator privileges
 	routeHelpers.setupApiRoute(router, 'get', '/extra-tools/moderation-tools/config', apiMiddleware, async (req, res) => {
 		try {
+			const uid = req.uid;
+			const isAdmin = await user.isAdministrator(uid);
+			const isGlobalMod = await user.isGlobalModerator(uid);
+			const isModerator = isAdmin || isGlobalMod || await user.isModeratorOfAnyCategory(uid);
+
+			if (!isModerator) {
+				return helpers.formatApiResponse(403, res, new Error('[[error:no-privileges]]'));
+			}
+
 			const config = await Plugin.getConfig();
 			helpers.formatApiResponse(200, res, config);
 		} catch (err) {
-			helpers.formatApiResponse(500, res, new Error(err.message));
+			helpers.formatApiResponse(500, res, Plugin.safeApiError(err));
 		}
 	});
 };
@@ -271,7 +412,6 @@ Plugin.renderModerationPage = async function (req, res, next) {
 	const isGlobalMod = await user.isGlobalModerator(uid);
 
 	if (!isAdmin && !isGlobalMod) {
-		// Check if user is moderator of any category
 		const isMod = await user.isModeratorOfAnyCategory(uid);
 		if (!isMod) {
 			return controllerHelpers.redirect(res, '/');
@@ -280,6 +420,19 @@ Plugin.renderModerationPage = async function (req, res, next) {
 
 	// Get config
 	const config = await Plugin.getConfig();
+
+	// Fix 1: Translate strings for JS use and pass via ajaxify.data
+	const userSettings = await user.getSettings(uid);
+	const userLang = userSettings.userLang || meta.config.defaultLang || 'en-GB';
+	const t = new translator(userLang);
+	const [saveText, savingText, saveSuccessText, unsavedChangesText, loadFailedText, saveFailedText] = await Promise.all([
+		t.translate('[[moderation-tools:save]]'),
+		t.translate('[[moderation-tools:saving]]'),
+		t.translate('[[moderation-tools:save-success]]'),
+		t.translate('[[moderation-tools:unsaved-changes]]'),
+		t.translate('[[moderation-tools:load-failed]]'),
+		t.translate('[[moderation-tools:save-failed]]'),
+	]);
 
 	// Get the initial cid from query parameter
 	const initialCid = req.query.cid ? parseInt(req.query.cid, 10) : null;
@@ -297,7 +450,6 @@ Plugin.renderModerationPage = async function (req, res, next) {
 	const validCategories = categoryData.filter(c => c && !c.disabled);
 
 	if (initialCid) {
-		// Verify the user has access to the requested category
 		const hasAccess = validCategories.some(c => c.cid === initialCid);
 		if (!hasAccess) {
 			return controllerHelpers.redirect(res, '/extra-tools/moderation-tools');
@@ -322,6 +474,15 @@ Plugin.renderModerationPage = async function (req, res, next) {
 		config: config,
 		isAdmin: isAdmin,
 		isGlobalMod: isGlobalMod,
+		// Fix 1: Pass translated strings for client-side JS
+		moderationToolsText: {
+			save: saveText,
+			saving: savingText,
+			saveSuccess: saveSuccessText,
+			unsavedChanges: unsavedChangesText,
+			loadFailed: loadFailedText,
+			saveFailed: saveFailedText,
+		},
 	});
 };
 
@@ -351,6 +512,32 @@ Plugin.addAdminNavigation = function (header, callback) {
 	});
 
 	callback(null, header);
+};
+
+/**
+ * Inject moderation tool data into all rendered pages via filter:middleware.render
+ */
+Plugin.addMiddlewareData = async function (data) {
+	const uid = data.req.uid;
+	if (uid > 0) {
+		const isAdmin = await user.isAdministrator(uid);
+		const isGlobalMod = await user.isGlobalModerator(uid);
+		const isModerator = isAdmin || isGlobalMod || await user.isModeratorOfAnyCategory(uid);
+
+		if (isModerator) {
+			data.templateData.moderationToolsUserCanModerate = true;
+		}
+	}
+
+	return data;
+};
+
+/**
+ * Add plugin script to page scripts via filter:scripts.get
+ */
+Plugin.addScripts = async function (scripts) {
+	scripts.push('/plugins/nodebb-plugin-moderation-tools/static/js/moderation-tools.js');
+	return scripts;
 };
 
 /**
@@ -394,7 +581,6 @@ Plugin.renderWidget = async function (data) {
 		return data;
 	}
 
-	// Determine the user's language for translation
 	const userSettings = await user.getSettings(uid);
 	const lang = userSettings.userLang || meta.config.defaultLang || 'en-GB';
 	const t = new translator(lang);
@@ -417,14 +603,12 @@ Plugin.renderWidget = async function (data) {
 		return data;
 	}
 
-	// Check if user is moderator of any category
 	const isMod = await user.isModeratorOfAnyCategory(uid);
 	if (!isMod) {
 		data.html = '';
 		return data;
 	}
 
-	// For regular moderators, show widget only if they have moderate privilege for the current category
 	if (cid) {
 		const hasModPrivilege = await privileges.categories.isAdminOrMod(cid, uid);
 		if (!hasModPrivilege) {

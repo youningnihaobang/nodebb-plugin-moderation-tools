@@ -1,22 +1,29 @@
 'use strict';
 
-/* global socket, $ */
+/* global socket, app */
 
-require(['admin/settings'], function (Settings) {
+/**
+ * ACP configuration page script.
+ * Wrapped in require() for jQuery dependency.
+ * Uses translator module for i18n (Fix 1).
+ */
+require(['jquery', 'translator'], function ($, translator) {
+	'use strict';
+
 	$(function () {
-		const $form = $('#moderation-tools-settings');
+		var $form = $('#moderation-tools-settings');
 
 		function collectSettings() {
-			const enabledFields = {};
-			const enabledSidebarActions = {};
+			var enabledFields = {};
+			var enabledSidebarActions = {};
 
 			$form.find('[data-field]').each(function () {
-				const field = $(this).data('field');
+				var field = $(this).data('field');
 				enabledFields[field] = $(this).is(':checked');
 			});
 
 			$form.find('[data-sidebar-action]').each(function () {
-				const action = $(this).data('sidebar-action');
+				var action = $(this).data('sidebar-action');
 				enabledSidebarActions[action] = $(this).is(':checked');
 			});
 
@@ -29,7 +36,7 @@ require(['admin/settings'], function (Settings) {
 		$form.on('submit', function (e) {
 			e.preventDefault();
 
-			const settings = collectSettings();
+			var settings = collectSettings();
 
 			socket.emit('plugins.moderation-tools.saveSettings', settings, function (err) {
 				if (err) {
@@ -40,11 +47,11 @@ require(['admin/settings'], function (Settings) {
 				}
 
 				if (typeof app !== 'undefined' && app.alert) {
-					app.alertSuccess('[[moderation-tools:admin:save-success]]');
+					// Fix 1: Use translator module instead of [[...]] template syntax
+					translator.translate('[[moderation-tools:admin:save-success]]', function (translated) {
+						app.alertSuccess(translated);
+					});
 				}
-
-				// Also save via Settings API for the standard ACP save mechanism
-				Settings.save('moderation-tools', $form.serializeArray());
 			});
 		});
 	});

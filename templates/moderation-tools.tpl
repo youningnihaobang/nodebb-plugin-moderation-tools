@@ -100,7 +100,7 @@
 						<input id="mt-subCategoriesPerPage" type="number" class="form-control" data-name="subCategoriesPerPage" min="0" style="max-width: 120px;" />
 					</div>
 
-				<!-- Min/Max Tags (wrapped, shown when either is enabled) -->
+				<!-- Min/Max Tags (shown when either is enabled) -->
 				<div class="mb-3 moderation-tools-field-group" data-field-group="tags">
 					<label class="form-label">[[moderation-tools:fields:minTags]] / [[moderation-tools:fields:maxTags]]</label>
 					<div class="d-flex gap-3 align-items-center">
@@ -208,13 +208,3 @@
 		</div>
 	</div>
 </div>
-
-<!-- Inline script to load moderation-tools.js -->
-<script>
-(function() {
-	var script = document.createElement('script');
-	script.src = '{config.relative_path}/plugins/nodebb-plugin-moderation-tools/static/js/moderation-tools.js';
-	script.async = true;
-	document.body.appendChild(script);
-})();
-</script>

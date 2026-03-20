@@ -8,6 +8,8 @@
 	"no-categories-help": "You don't have moderation permissions for any category. Please contact an administrator.",
 	"loading": "Loading category data...",
 	"unsaved-changes": "You have unsaved changes. Are you sure you want to leave?",
+	"load-failed": "Failed to load category data.",
+	"save-failed": "Failed to save category settings.",
 	"no-parent": "None (Top Level)",
 
 	"fields": {
