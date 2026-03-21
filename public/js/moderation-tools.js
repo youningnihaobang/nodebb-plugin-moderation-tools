@@ -9,7 +9,7 @@
  * as fallback; also uses client-side translator module for robustness.
  */
 /* global ajaxify, config */
-define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator', 'alerts'], function ($, translator, alerts) {
+define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, translator, alerts) {
 	'use strict';
 
 	var ModerationTools = {};
@@ -406,22 +406,4 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 	};
 
 	return ModerationTools;
-});
-
-// Self-initialize: require the module and set up page detection.
-// define() only registers the module; this require() triggers initialization.
-require(['jquery', 'nodebb-plugin-moderation-tools/moderation-tools'], function ($, ModerationTools) {
-	$(window).on('action:ajaxify.end.moderationTools', function () {
-		if (typeof ajaxify !== 'undefined' && ajaxify.currentPage === 'extra-tools/moderation-tools') {
-			ModerationTools.init();
-		} else {
-			// Clean up beforeunload listener when navigating away from the page
-			$(window).off('beforeunload.moderationTools');
-		}
-	});
-
-	// Handle initial page load (script loaded after DOM ready from filter:scripts.get in footer)
-	if (typeof ajaxify !== 'undefined' && ajaxify.currentPage === 'extra-tools/moderation-tools') {
-		ModerationTools.init();
-	}
 });

@@ -36,7 +36,7 @@
 		</label>
 		<select id="moderation-tools-cid-select" class="form-select">
 			{{{ each categories }}}
-			<option value="{categories.cid}" {{{ if categories.cid === initialCid }}}selected{{{ end }}}>
+			<option value="{categories.cid}" {{{ if categories.selected }}}selected{{{ end }}}>
 				{categories.name} (CID: {categories.cid})
 			</option>
 			{{{ end }}}

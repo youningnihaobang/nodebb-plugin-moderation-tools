@@ -33,7 +33,7 @@ Plugin.numericFieldLimits = {
 	parentCid: { min: 0 },
 };
 
-// Default configuration
+// Default configuration (nested, used by getConfig for runtime)
 Plugin.defaultConfig = {
 	enabledFields: {
 		name: false,
@@ -61,32 +61,40 @@ Plugin.defaultConfig = {
 	},
 };
 
+// Flat defaults for meta.settings (used by filter:settings.get hook)
+// Stored as 'on'/'off' strings, matching the standard settings module convention
+Plugin.settingsDefaults = {};
+for (const field of Plugin.allFields) {
+	Plugin.settingsDefaults[`enabledFields_${field}`] = Plugin.defaultConfig.enabledFields[field] ? 'on' : 'off';
+}
+for (const action of Plugin.sidebarActions) {
+	Plugin.settingsDefaults[`enabledSidebarActions_${action}`] = Plugin.defaultConfig.enabledSidebarActions[action] ? 'on' : 'off';
+}
+
 /**
  * Get plugin configuration from meta.settings
+ * Settings are stored in flat format (e.g., enabledFields_name, enabledSidebarActions_viewCategory)
+ * This function reconstructs the nested structure from flat keys.
  */
 Plugin.getConfig = async function () {
 	const settings = await meta.settings.get('moderation-tools');
 	const config = JSON.parse(JSON.stringify(Plugin.defaultConfig));
 
-	if (settings && settings.enabledFields) {
-		try {
-			const fields = JSON.parse(settings.enabledFields);
-			if (fields && typeof fields === 'object') {
-				Object.assign(config.enabledFields, fields);
+	if (settings) {
+		// Reconstruct enabledFields from flat keys like "enabledFields_name"
+		for (const field of Plugin.allFields) {
+			const key = `enabledFields_${field}`;
+			if (settings.hasOwnProperty(key)) {
+				config.enabledFields[field] = settings[key] === 'on' || settings[key] === true;
 			}
-		} catch (e) {
-			winston.warn('[plugins/moderation-tools] Failed to parse enabledFields config');
 		}
-	}
 
-	if (settings && settings.enabledSidebarActions) {
-		try {
-			const actions = JSON.parse(settings.enabledSidebarActions);
-			if (actions && typeof actions === 'object') {
-				Object.assign(config.enabledSidebarActions, actions);
+		// Reconstruct enabledSidebarActions from flat keys like "enabledSidebarActions_viewCategory"
+		for (const action of Plugin.sidebarActions) {
+			const key = `enabledSidebarActions_${action}`;
+			if (settings.hasOwnProperty(key)) {
+				config.enabledSidebarActions[action] = settings[key] === 'on' || settings[key] === true;
 			}
-		} catch (e) {
-			winston.warn('[plugins/moderation-tools] Failed to parse enabledSidebarActions config');
 		}
 	}
 
@@ -189,7 +197,7 @@ Plugin.safeApiError = function (err, fallbackKey) {
 };
 
 /**
- * Initialize plugin - register routes and socket methods
+ * Initialize plugin - register routes
  */
 Plugin.init = async function (params) {
 	const { router, middleware } = params;
@@ -209,12 +217,6 @@ Plugin.init = async function (params) {
 		[middleware.pluginHooks],
 		Plugin.renderAdminPage
 	);
-
-	// Socket methods for saving configuration
-	const SocketPlugins = require.main.require('./src/socket.io/plugins');
-	SocketPlugins['moderation-tools'] = {
-		saveSettings: Plugin.socketSaveSettings,
-	};
 };
 
 /**
@@ -510,6 +512,11 @@ Plugin.renderModerationPage = async function (req, res, next) {
 	const categoryData = await categories.getCategoriesFields(cids, ['cid', 'name', 'icon', 'bgColor', 'color', 'parentCid', 'disabled']);
 	const validCategories = categoryData.filter(c => c && !c.disabled);
 
+	// Add 'selected' flag for Benchpress template conditional
+	validCategories.forEach(function (category) {
+		category.selected = (category.cid === initialCid);
+	});
+
 	if (initialCid) {
 		const hasAccess = validCategories.some(c => c.cid === initialCid);
 		if (!hasAccess) {
@@ -553,17 +560,20 @@ Plugin.renderModerationPage = async function (req, res, next) {
 
 /**
  * Render the ACP configuration page
+ * Settings are loaded client-side via settings.load(), following the standard NodeBB pattern.
  */
 Plugin.renderAdminPage = async function (req, res, next) {
 	try {
-	const config = await Plugin.getConfig();
-
-	res.render('admin/moderation-tools', {
+		console.log('[moderation-tools] renderAdminPage: allFields =', JSON.stringify(Plugin.allFields));
+		console.log('[moderation-tools] renderAdminPage: sidebarActions =', JSON.stringify(Plugin.sidebarActions));
+		res.render('admin/plugins/moderation-tools', {
 		title: '[[moderation-tools:admin.title]]',
-		allFields: Plugin.allFields,
-		sidebarActions: Plugin.sidebarActions,
-		enabledFields: config.enabledFields,
-		enabledSidebarActions: config.enabledSidebarActions,
+		allFields: Plugin.allFields.map(function (field) {
+			return { name: field };
+		}),
+		sidebarActions: Plugin.sidebarActions.map(function (action) {
+			return { name: action };
+		}),
 	});
 	} catch (err) {
 		winston.error('[plugins/moderation-tools] renderAdminPage error: ' + (err.stack || err.message));
@@ -582,6 +592,24 @@ Plugin.addAdminNavigation = async function (header) {
 	});
 
 	return header;
+};
+
+/**
+ * Merge default settings into values returned by meta.settings.get
+ * Ensures new installations have correct default values ('on'/'off')
+ */
+Plugin.getAdminSettings = async function (hookData) {
+	console.log('[moderation-tools] getAdminSettings hook fired, plugin:', hookData.plugin);
+	if (hookData.plugin === 'moderation-tools') {
+		console.log('[moderation-tools] getAdminSettings incoming values:', JSON.stringify(hookData.values));
+		console.log('[moderation-tools] getAdminSettings defaults:', JSON.stringify(Plugin.settingsDefaults));
+		hookData.values = {
+			...Plugin.settingsDefaults,
+			...hookData.values,
+		};
+		console.log('[moderation-tools] getAdminSettings merged values:', JSON.stringify(hookData.values));
+	}
+	return hookData;
 };
 
 /**
@@ -606,43 +634,6 @@ Plugin.addMiddlewareData = async function (data) {
 	}
 
 	return data;
-};
-
-/**
- * Add plugin script to page scripts via filter:scripts.get
- */
-Plugin.addScripts = async function (scripts) {
-	scripts.push('/plugins/nodebb-plugin-moderation-tools/static/js/moderation-tools.js');
-	return scripts;
-};
-
-/**
- * Socket handler for saving ACP settings
- */
-Plugin.socketSaveSettings = async function (socket, data) {
-	if (!socket.uid || !await user.isAdministrator(socket.uid)) {
-		throw new Error('[[error:no-privileges]]');
-	}
-
-	// Security: Validate data parameter is a valid object
-	if (!data || typeof data !== 'object') {
-		throw new Error('[[error:invalid-data]]');
-	}
-
-	// Security: Validate input shape - only allow known fields with boolean values
-	const enabledFields = {};
-	for (const field of Plugin.allFields) {
-		enabledFields[field] = !!(data.enabledFields && data.enabledFields[field]);
-	}
-	const enabledSidebarActions = {};
-	for (const action of Plugin.sidebarActions) {
-		enabledSidebarActions[action] = !!(data.enabledSidebarActions && data.enabledSidebarActions[action]);
-	}
-
-	await meta.settings.set('moderation-tools', {
-		enabledFields: JSON.stringify(enabledFields),
-		enabledSidebarActions: JSON.stringify(enabledSidebarActions),
-	});
 };
 
 /**

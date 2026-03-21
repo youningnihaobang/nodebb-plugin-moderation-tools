@@ -6,8 +6,8 @@
     { "hook": "static:app.load", "method": "init" },
     { "hook": "static:api.routes", "method": "addApiRoutes" },
     { "hook": "filter:admin.header.build", "method": "addAdminNavigation" },
+    { "hook": "filter:settings.get", "method": "getAdminSettings" },
     { "hook": "filter:middleware.render", "method": "addMiddlewareData" },
-    { "hook": "filter:scripts.get", "method": "addScripts" },
     { "hook": "filter:widgets.getWidgets", "method": "defineWidget" },
     { "hook": "filter:widget.render:moderation-tools-link", "method": "renderWidget" }
   ],
@@ -18,8 +18,12 @@
     "public/scss/moderation-tools.scss"
   ],
   "modules": {
-    "../admin/plugins/moderation-tools.js": "./public/js/admin.js"
+    "../admin/plugins/moderation-tools.js": "./public/js/admin.js",
+    "moderation-tools": "./public/js/moderation-tools.js"
   },
+  "scripts": [
+    "./public/js/client.js"
+  ],
   "templates": "templates",
   "languages": "languages",
   "defaultLang": "en-GB"

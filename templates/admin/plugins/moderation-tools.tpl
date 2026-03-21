@@ -2,10 +2,10 @@
 	<!-- IMPORT admin/partials/settings/header.tpl -->
 
 	<div class="row m-0">
-		<div id="spy-container" class="col-12 px-2 mb-4" tabindex="0">
+		<div id="spy-container" class="col-12 col-md-8 px-0 mb-4" tabindex="0">
 			<h5 class="fw-bold tracking-tight settings-header">[[moderation-tools:admin.description]]</h5>
 
-			<form id="moderation-tools-settings" role="form" class="moderation-tools-settings">
+			<form role="form" class="moderation-tools-settings">
 				<div class="mb-4">
 					<h5 class="fw-bold tracking-tight settings-header">[[moderation-tools:admin.fields-title]]</h5>
 					<p class="form-text text-muted">
@@ -17,11 +17,11 @@
 								{{{ each allFields }}}
 								<div class="list-group-item d-flex justify-content-between align-items-center">
 									<div>
-										<strong>[[moderation-tools:fields.{@value}]]</strong>
-										<small class="text-muted d-block"><code>{@value}</code></small>
+										<strong>[[moderation-tools:fields.{./name}]]</strong>
+										<small class="text-muted d-block"><code>{./name}</code></small>
 									</div>
 									<div class="form-check form-switch mb-0">
-										<input type="checkbox" class="form-check-input" data-field="{@value}" {{{ if enabledFields[@value] }}}checked{{{ end }}} />
+										<input type="checkbox" class="form-check-input" id="enabledFields_{./name}" name="enabledFields_{./name}" />
 									</div>
 								</div>
 								{{{ end }}}
@@ -41,11 +41,11 @@
 								{{{ each sidebarActions }}}
 								<div class="list-group-item d-flex justify-content-between align-items-center">
 									<div>
-										<strong>[[moderation-tools:sidebar-actions.{@value}]]</strong>
-										<small class="text-muted d-block"><code>{@value}</code></small>
+										<strong>[[moderation-tools:sidebar-actions.{./name}]]</strong>
+										<small class="text-muted d-block"><code>{./name}</code></small>
 									</div>
 									<div class="form-check form-switch mb-0">
-										<input type="checkbox" class="form-check-input" data-sidebar-action="{@value}" {{{ if enabledSidebarActions[@value] }}}checked{{{ end }}} />
+										<input type="checkbox" class="form-check-input" id="enabledSidebarActions_{./name}" name="enabledSidebarActions_{./name}" />
 									</div>
 								</div>
 								{{{ end }}}
