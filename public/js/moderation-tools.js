@@ -8,8 +8,8 @@
  * Uses ajaxify.data.moderationToolsText (pre-translated by server)
  * as fallback; also uses client-side translator module for robustness.
  */
-/* global ajaxify, config, app */
-define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator'], function ($, translator) {
+/* global ajaxify, config */
+define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator', 'alerts'], function ($, translator, alerts) {
 	'use strict';
 
 	var ModerationTools = {};
@@ -185,12 +185,12 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 				hasChanges = false;
 				$saveBtn.removeClass('btn-warning').addClass('btn-primary');
 			} catch (err) {
-				$loading.addClass('hidden');
-				$formContainer.addClass('hidden');
-				if (typeof app !== 'undefined' && app.alert) {
-					app.alertError(err.message);
-				}
+			$loading.addClass('hidden');
+			$formContainer.addClass('hidden');
+			if (alerts) {
+				alerts.error(err.message);
 			}
+		}
 		}
 
 		// Populate form with category data
@@ -318,10 +318,10 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 				hasChanges = false;
 				$saveBtn.removeClass('btn-warning').addClass('btn-primary');
 
-				var successStr = text.saveSuccess || 'Category settings saved successfully.';
-				if (typeof app !== 'undefined' && app.alert) {
-					app.alertSuccess(successStr);
-				}
+			var successStr = text.saveSuccess || 'Category settings saved successfully.';
+			if (alerts) {
+				alerts.success(successStr);
+			}
 
 				// Update category name in selector if name was changed
 				if (formData.name) {
@@ -330,10 +330,10 @@ define('nodebb-plugin-moderation-tools/moderation-tools', ['jquery', 'translator
 						$option.text(formData.name + ' (CID: ' + currentCid + ')');
 					}
 				}
-			} catch (err) {
-				if (typeof app !== 'undefined' && app.alert) {
-					app.alertError(err.message);
-				}
+		} catch (err) {
+			if (alerts) {
+				alerts.error(err.message);
+			}
 			} finally {
 				isSaving = false;
 				var saveStr = text.save || 'Save Changes';

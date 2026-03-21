@@ -486,14 +486,13 @@ Plugin.renderModerationPage = async function (req, res, next) {
 
 	// Translate strings for JS use and pass via ajaxify.data
 	const userLang = userSettings.userLang || meta.config.defaultLang || 'en-GB';
-	const t = new translator(userLang);
 	const [saveText, savingText, saveSuccessText, unsavedChangesText, loadFailedText, saveFailedText] = await Promise.all([
-		t.translate('[[moderation-tools:save]]'),
-		t.translate('[[moderation-tools:saving]]'),
-		t.translate('[[moderation-tools:save-success]]'),
-		t.translate('[[moderation-tools:unsaved-changes]]'),
-		t.translate('[[moderation-tools:load-failed]]'),
-		t.translate('[[moderation-tools:save-failed]]'),
+		translator.translate('[[moderation-tools:save]]', userLang),
+		translator.translate('[[moderation-tools:saving]]', userLang),
+		translator.translate('[[moderation-tools:save-success]]', userLang),
+		translator.translate('[[moderation-tools:unsaved-changes]]', userLang),
+		translator.translate('[[moderation-tools:load-failed]]', userLang),
+		translator.translate('[[moderation-tools:save-failed]]', userLang),
 	]);
 
 	// Get the initial cid from query parameter
@@ -560,7 +559,7 @@ Plugin.renderAdminPage = async function (req, res, next) {
 	const config = await Plugin.getConfig();
 
 	res.render('admin/moderation-tools', {
-		title: '[[moderation-tools:admin:title]]',
+		title: '[[moderation-tools:admin.title]]',
 		allFields: Plugin.allFields,
 		sidebarActions: Plugin.sidebarActions,
 		enabledFields: config.enabledFields,
@@ -579,7 +578,7 @@ Plugin.addAdminNavigation = async function (header) {
 	header.plugins.push({
 		route: '/plugins/moderation-tools',
 		icon: 'fa-wrench',
-		name: '[[moderation-tools:admin:title]]',
+		name: '[[moderation-tools:admin.title]]',
 	});
 
 	return header;
@@ -651,10 +650,10 @@ Plugin.socketSaveSettings = async function (socket, data) {
  */
 Plugin.defineWidget = async function (widgets) {
 	widgets.push({
-		name: '[[moderation-tools:widget:name]]',
+		name: '[[moderation-tools:widget.name]]',
 		widget: 'moderation-tools-link',
-		description: '[[moderation-tools:widget:description]]',
-		content: '<a href="{relative_path}/extra-tools/moderation-tools" class="btn btn-primary btn-block">[[moderation-tools:widget:label]]</a>',
+		description: '[[moderation-tools:widget.description]]',
+		content: '<a href="{relative_path}/extra-tools/moderation-tools" class="btn btn-primary btn-block">[[moderation-tools:widget.label]]</a>',
 	});
 
 	return widgets;
@@ -672,8 +671,7 @@ Plugin.renderWidget = async function (data) {
 
 	const userSettings = await user.getSettings(uid);
 	const lang = userSettings.userLang || meta.config.defaultLang || 'en-GB';
-	const t = new translator(lang);
-	const label = await t.translate('[[moderation-tools:widget:label]]');
+	const label = await translator.translate('[[moderation-tools:widget.label]]', lang);
 
 	const isAdmin = await user.isAdministrator(uid);
 	const isGlobalMod = await user.isGlobalModerator(uid);

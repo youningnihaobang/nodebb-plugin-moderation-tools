@@ -1,12 +1,12 @@
 'use strict';
 
-/* global socket, app */
+/* global socket */
 
 /**
  * ACP configuration page script.
  * Uses the standard #save button provided by admin/partials/settings/header.tpl.
  */
-define('admin/plugins/moderation-tools', ['jquery', 'translator'], function ($, translator) {
+define('admin/plugins/moderation-tools', ['jquery', 'translator', 'alerts'], function ($, translator, alerts) {
 	'use strict';
 
 	var ACP = {};
@@ -39,17 +39,13 @@ define('admin/plugins/moderation-tools', ['jquery', 'translator'], function ($, 
 
 			socket.emit('plugins.moderation-tools.saveSettings', settings, function (err) {
 				if (err) {
-					if (typeof app !== 'undefined' && app.alert) {
-						app.alertError(err.message);
-					}
+					alerts.error(err.message);
 					return;
 				}
 
-				if (typeof app !== 'undefined' && app.alert) {
-					translator.translate('[[moderation-tools:admin:save-success]]', function (translated) {
-						app.alertSuccess(translated);
-					});
-				}
+				translator.translate('[[moderation-tools:admin.save-success]]', function (translated) {
+					alerts.success(translated);
+				});
 			});
 		});
 	};

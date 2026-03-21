@@ -64,33 +64,33 @@
 
 					<!-- Name -->
 					<div class="mb-3 moderation-tools-field" data-field="name">
-						<label class="form-label" for="mt-name">[[moderation-tools:fields:name]]</label>
+						<label class="form-label" for="mt-name">[[moderation-tools:fields.name]]</label>
 						<input id="mt-name" type="text" class="form-control" data-name="name" />
 					</div>
 
 					<!-- Handle -->
 					<div class="mb-3 moderation-tools-field" data-field="handle">
-						<label class="form-label" for="mt-handle">[[moderation-tools:fields:handle]]</label>
+						<label class="form-label" for="mt-handle">[[moderation-tools:fields.handle]]</label>
 						<input id="mt-handle" type="text" class="form-control" data-name="handle" />
-						<p class="form-text">[[moderation-tools:fields:handle-help]]</p>
+						<p class="form-text">[[moderation-tools:fields.handle-help]]</p>
 					</div>
 
 					<!-- Description -->
 					<div class="mb-3 moderation-tools-field" data-field="description">
-						<label class="form-label" for="mt-description">[[moderation-tools:fields:description]]</label>
+						<label class="form-label" for="mt-description">[[moderation-tools:fields.description]]</label>
 						<textarea id="mt-description" data-name="description" class="form-control" rows="4"></textarea>
 					</div>
 
 					<!-- Topic Template -->
 					<div class="mb-3 moderation-tools-field" data-field="topicTemplate">
-						<label class="form-label" for="mt-topicTemplate">[[moderation-tools:fields:topicTemplate]]</label>
+						<label class="form-label" for="mt-topicTemplate">[[moderation-tools:fields.topicTemplate]]</label>
 						<textarea id="mt-topicTemplate" data-name="topicTemplate" class="form-control" rows="4"></textarea>
-						<p class="form-text">[[moderation-tools:fields:topicTemplate-help]]</p>
+						<p class="form-text">[[moderation-tools:fields.topicTemplate-help]]</p>
 					</div>
 
 					<!-- Parent Category -->
 					<div class="mb-3 moderation-tools-field" data-field="parentCid">
-						<label class="form-label" for="mt-parentCid">[[moderation-tools:fields:parentCid]]</label>
+						<label class="form-label" for="mt-parentCid">[[moderation-tools:fields.parentCid]]</label>
 						<select id="mt-parentCid" data-name="parentCid" class="form-select">
 							<option value="0">[[moderation-tools:no-parent]]</option>
 							{{{ each categories }}}
@@ -101,26 +101,26 @@
 
 					<!-- Num Recent Replies -->
 					<div class="mb-3 moderation-tools-field" data-field="numRecentReplies">
-						<label class="form-label" for="mt-numRecentReplies">[[moderation-tools:fields:numRecentReplies]]</label>
+						<label class="form-label" for="mt-numRecentReplies">[[moderation-tools:fields.numRecentReplies]]</label>
 						<input id="mt-numRecentReplies" type="number" class="form-control" data-name="numRecentReplies" min="0" style="max-width: 120px;" />
 					</div>
 
 					<!-- Sub Categories Per Page -->
 					<div class="mb-3 moderation-tools-field" data-field="subCategoriesPerPage">
-						<label class="form-label" for="mt-subCategoriesPerPage">[[moderation-tools:fields:subCategoriesPerPage]]</label>
+						<label class="form-label" for="mt-subCategoriesPerPage">[[moderation-tools:fields.subCategoriesPerPage]]</label>
 						<input id="mt-subCategoriesPerPage" type="number" class="form-control" data-name="subCategoriesPerPage" min="0" style="max-width: 120px;" />
 					</div>
 
 				<!-- Min/Max Tags (shown when either is enabled) -->
 				<div class="mb-3 moderation-tools-field-group" data-field-group="tags">
-					<label class="form-label">[[moderation-tools:fields:minTags]] / [[moderation-tools:fields:maxTags]]</label>
+					<label class="form-label">[[moderation-tools:fields.minTags]] / [[moderation-tools:fields.maxTags]]</label>
 					<div class="d-flex gap-3 align-items-center">
 						<div class="d-flex gap-1 align-items-center">
-							<label for="mt-minTags" class="form-label mb-0">[[moderation-tools:fields:min-label]]</label>
+							<label for="mt-minTags" class="form-label mb-0">[[moderation-tools:fields.min-label]]</label>
 							<input id="mt-minTags" type="number" class="form-control mt-min-tags-field" data-name="minTags" min="0" style="max-width: 80px;" />
 						</div>
 						<div class="d-flex gap-1 align-items-center">
-							<label for="mt-maxTags" class="form-label mb-0">[[moderation-tools:fields:max-label]]</label>
+							<label for="mt-maxTags" class="form-label mb-0">[[moderation-tools:fields.max-label]]</label>
 							<input id="mt-maxTags" type="number" class="form-control mt-max-tags-field" data-name="maxTags" min="0" style="max-width: 80px;" />
 						</div>
 					</div>
@@ -128,14 +128,14 @@
 
 					<!-- Tag Whitelist -->
 					<div class="mb-3 moderation-tools-field" data-field="tagWhitelist">
-						<label class="form-label" for="mt-tagWhitelist">[[moderation-tools:fields:tagWhitelist]]</label>
+						<label class="form-label" for="mt-tagWhitelist">[[moderation-tools:fields.tagWhitelist]]</label>
 						<input id="mt-tagWhitelist" type="text" class="form-control" data-name="tagWhitelist" />
-						<p class="form-text">[[moderation-tools:fields:tagWhitelist-help]]</p>
+						<p class="form-text">[[moderation-tools:fields.tagWhitelist-help]]</p>
 					</div>
 
 					<!-- External Link -->
 					<div class="mb-3 moderation-tools-field" data-field="link">
-						<label class="form-label" for="mt-link">[[moderation-tools:fields:link]]</label>
+						<label class="form-label" for="mt-link">[[moderation-tools:fields.link]]</label>
 						<input id="mt-link" type="text" class="form-control" data-name="link" placeholder="http://example.com" />
 					</div>
 
@@ -143,7 +143,7 @@
 					<div class="mb-3 moderation-tools-field" data-field="isSection">
 						<div class="form-check form-switch">
 							<input type="checkbox" class="form-check-input" id="mt-isSection" data-name="isSection" />
-							<label for="mt-isSection" class="form-check-label">[[moderation-tools:fields:isSection]]</label>
+							<label for="mt-isSection" class="form-check-label">[[moderation-tools:fields.isSection]]</label>
 						</div>
 					</div>
 
@@ -151,7 +151,7 @@
 					<div class="mb-3 moderation-tools-field" data-field="postQueue">
 						<div class="form-check form-switch">
 							<input type="checkbox" class="form-check-input" id="mt-postQueue" data-name="postQueue" />
-							<label for="mt-postQueue" class="form-check-label">[[moderation-tools:fields:postQueue]]</label>
+							<label for="mt-postQueue" class="form-check-label">[[moderation-tools:fields.postQueue]]</label>
 						</div>
 					</div>
 
@@ -159,13 +159,13 @@
 
 					<!-- Background Image -->
 					<div class="mb-3 moderation-tools-field" data-field="backgroundImage">
-						<label class="form-label" for="mt-backgroundImage">[[moderation-tools:fields:backgroundImage]]</label>
+						<label class="form-label" for="mt-backgroundImage">[[moderation-tools:fields.backgroundImage]]</label>
 						<input id="mt-backgroundImage" type="text" class="form-control" data-name="backgroundImage" placeholder="https://example.com/image.jpg" />
 					</div>
 
 					<!-- Background Color -->
 					<div class="mb-3 moderation-tools-field" data-field="bgColor">
-						<label class="form-label" for="mt-bgColor">[[moderation-tools:fields:bgColor]]</label>
+						<label class="form-label" for="mt-bgColor">[[moderation-tools:fields.bgColor]]</label>
 						<div class="d-flex gap-2 align-items-center" style="max-width: 200px;">
 							<input type="text" id="mt-bgColor" data-name="bgColor" class="form-control" placeholder="#ffffff" pattern="^#[0-9a-fA-F]{6}$" />
 							<input type="color" class="form-control form-control-color p-1 mt-color-preview" style="min-width: 40px; height: 38px;" data-target="mt-bgColor" />
@@ -174,7 +174,7 @@
 
 					<!-- Text Color -->
 					<div class="mb-3 moderation-tools-field" data-field="color">
-						<label class="form-label" for="mt-color">[[moderation-tools:fields:color]]</label>
+						<label class="form-label" for="mt-color">[[moderation-tools:fields.color]]</label>
 						<div class="d-flex gap-2 align-items-center" style="max-width: 200px;">
 							<input type="text" id="mt-color" data-name="color" class="form-control" placeholder="#ffffff" pattern="^#[0-9a-fA-F]{6}$" />
 							<input type="color" class="form-control form-control-color p-1 mt-color-preview" style="min-width: 40px; height: 38px;" data-target="mt-color" />
@@ -183,7 +183,7 @@
 
 					<!-- Image Class -->
 					<div class="mb-3 moderation-tools-field" data-field="imageClass">
-						<label class="form-label" for="mt-imageClass">[[moderation-tools:fields:imageClass]]</label>
+						<label class="form-label" for="mt-imageClass">[[moderation-tools:fields.imageClass]]</label>
 						<select id="mt-imageClass" data-name="imageClass" class="form-select w-auto">
 							<option value="auto">auto</option>
 							<option value="cover">cover</option>
@@ -193,7 +193,7 @@
 
 					<!-- Custom Class -->
 					<div class="mb-3 moderation-tools-field" data-field="class">
-						<label class="form-label" for="mt-class">[[moderation-tools:fields:class]]</label>
+						<label class="form-label" for="mt-class">[[moderation-tools:fields.class]]</label>
 						<input id="mt-class" type="text" class="form-control" data-name="class" />
 					</div>
 				</form>
@@ -208,12 +208,12 @@
 						<div class="list-group list-group-flush">
 							<a id="mt-sidebar-view" href="#" class="list-group-item list-group-item-action d-flex gap-2 align-items-center hidden">
 								<i class="fa fa-eye text-primary"></i>
-								[[moderation-tools:sidebar-actions:viewCategory]]
+								[[moderation-tools:sidebar-actions.viewCategory]]
 							</a>
 
 							<a id="mt-sidebar-analytics" href="#" class="list-group-item list-group-item-action d-flex gap-2 align-items-center hidden">
 								<i class="fa fa-chart-simple text-primary"></i>
-								[[moderation-tools:sidebar-actions:analytics]]
+								[[moderation-tools:sidebar-actions.analytics]]
 							</a>
 						</div>
 					</div>
