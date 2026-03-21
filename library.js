@@ -6,6 +6,7 @@ const user = require.main.require('./src/user');
 const categories = require.main.require('./src/categories');
 const privileges = require.main.require('./src/privileges');
 const meta = require.main.require('./src/meta');
+const plugins = require.main.require('./src/plugins');
 const translator = require.main.require('./src/translator');
 const routeHelpers = require.main.require('./src/routes/helpers');
 const controllerHelpers = require.main.require('./src/controllers/helpers');
@@ -21,6 +22,31 @@ Plugin.allFields = [
 	'imageClass', 'class',
 ];
 
+// Built-in field definitions with metadata (used by getFields)
+Plugin.builtinFieldDefs = [
+	{ key: 'name', label: 'moderation-tools:fields.name', type: 'text', group: 'core', description: 'moderation-tools:fields.name.desc', order: 1 },
+	{ key: 'handle', label: 'moderation-tools:fields.handle', type: 'text', group: 'core', description: 'moderation-tools:fields.handle.desc', order: 2 },
+	{ key: 'description', label: 'moderation-tools:fields.description', type: 'textarea', group: 'core', description: 'moderation-tools:fields.description.desc', order: 3 },
+	{ key: 'topicTemplate', label: 'moderation-tools:fields.topicTemplate', type: 'textarea', group: 'core', description: 'moderation-tools:fields.topicTemplate.desc', order: 4 },
+	{ key: 'parentCid', label: 'moderation-tools:fields.parentCid', type: 'number', group: 'core', description: 'moderation-tools:fields.parentCid.desc', order: 5 },
+	{ key: 'numRecentReplies', label: 'moderation-tools:fields.numRecentReplies', type: 'number', group: 'core', description: 'moderation-tools:fields.numRecentReplies.desc', order: 6 },
+	{ key: 'subCategoriesPerPage', label: 'moderation-tools:fields.subCategoriesPerPage', type: 'number', group: 'core', description: 'moderation-tools:fields.subCategoriesPerPage.desc', order: 7 },
+	{ key: 'minTags', label: 'moderation-tools:fields.minTags', type: 'number', group: 'core', description: 'moderation-tools:fields.minTags.desc', order: 8 },
+	{ key: 'maxTags', label: 'moderation-tools:fields.maxTags', type: 'number', group: 'core', description: 'moderation-tools:fields.maxTags.desc', order: 9 },
+	{ key: 'tagWhitelist', label: 'moderation-tools:fields.tagWhitelist', type: 'text', group: 'core', description: 'moderation-tools:fields.tagWhitelist.desc', order: 10 },
+	{ key: 'link', label: 'moderation-tools:fields.link', type: 'text', group: 'core', description: 'moderation-tools:fields.link.desc', order: 11 },
+	{ key: 'isSection', label: 'moderation-tools:fields.isSection', type: 'boolean', group: 'core', description: 'moderation-tools:fields.isSection.desc', order: 12 },
+	{ key: 'postQueue', label: 'moderation-tools:fields.postQueue', type: 'boolean', group: 'core', description: 'moderation-tools:fields.postQueue.desc', order: 13 },
+	{ key: 'backgroundImage', label: 'moderation-tools:fields.backgroundImage', type: 'text', group: 'core', description: 'moderation-tools:fields.backgroundImage.desc', order: 14 },
+	{ key: 'bgColor', label: 'moderation-tools:fields.bgColor', type: 'color', group: 'core', description: 'moderation-tools:fields.bgColor.desc', order: 15 },
+	{ key: 'color', label: 'moderation-tools:fields.color', type: 'color', group: 'core', description: 'moderation-tools:fields.color.desc', order: 16 },
+	{ key: 'imageClass', label: 'moderation-tools:fields.imageClass', type: 'select', group: 'core', description: 'moderation-tools:fields.imageClass.desc', order: 17 },
+	{ key: 'class', label: 'moderation-tools:fields.class', type: 'text', group: 'core', description: 'moderation-tools:fields.class.desc', order: 18 },
+];
+
+// Cache for getFields() results
+Plugin._fieldsCache = null;
+
 // Sidebar actions available
 Plugin.sidebarActions = ['viewCategory', 'analytics'];
 
@@ -31,6 +57,53 @@ Plugin.numericFieldLimits = {
 	minTags: { max: 100, min: 0 },
 	maxTags: { max: 100, min: 0 },
 	parentCid: { min: 0 },
+};
+
+/**
+ * Get all field definitions (built-in + extension fields from other plugins).
+ * Fires filter:moderation-tools.fields hook to let other plugins register custom fields.
+ * Results are cached; call resetFieldsCache() to invalidate.
+ * @returns {Promise<Array>} sorted array of field definitions
+ */
+Plugin.getFields = async function () {
+	if (Plugin._fieldsCache) {
+		return Plugin._fieldsCache;
+	}
+
+	// Start with built-in field definitions (shallow copy)
+	const fields = Plugin.builtinFieldDefs.map(function (f) {
+		return Object.assign({}, f, { isExtension: false });
+	});
+
+	// Fire filter hook to let other plugins add/modify field definitions
+	let result = { fields: fields };
+	result = await plugins.hooks.fire('filter:moderation-tools.fields', result);
+
+	// Mark any fields not in the built-in list as extensions
+	const builtinKeys = new Set(Plugin.allFields);
+	for (const field of result.fields) {
+		if (!builtinKeys.has(field.key)) {
+			field.isExtension = true;
+		}
+	}
+
+	// Sort by order property (ascending), extensions without order go last
+	result.fields.sort(function (a, b) {
+		const orderA = a.order !== undefined ? a.order : Infinity;
+		const orderB = b.order !== undefined ? b.order : Infinity;
+		return orderA - orderB;
+	});
+
+	Plugin._fieldsCache = result.fields;
+	return Plugin._fieldsCache;
+};
+
+/**
+ * Reset the fields cache so the next getFields() call re-fires the hook.
+ * Should be called when extension plugins are installed/uninstalled.
+ */
+Plugin.resetFieldsCache = function () {
+	Plugin._fieldsCache = null;
 };
 
 // Default configuration (nested, used by getConfig for runtime)
@@ -80,12 +153,16 @@ Plugin.getConfig = async function () {
 	const settings = await meta.settings.get('moderation-tools');
 	const config = JSON.parse(JSON.stringify(Plugin.defaultConfig));
 
+	// Get all fields (built-in + extension) to handle extension field keys
+	const allFieldDefs = await Plugin.getFields();
+
 	if (settings) {
 		// Reconstruct enabledFields from flat keys like "enabledFields_name"
-		for (const field of Plugin.allFields) {
-			const key = `enabledFields_${field}`;
+		// Include both built-in and extension fields
+		for (const fieldDef of allFieldDefs) {
+			const key = `enabledFields_${fieldDef.key}`;
 			if (settings.hasOwnProperty(key)) {
-				config.enabledFields[field] = settings[key] === 'on' || settings[key] === true;
+				config.enabledFields[fieldDef.key] = settings[key] === 'on' || settings[key] === true;
 			}
 		}
 
@@ -277,19 +354,26 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			const config = await Plugin.getConfig();
 			const enabledFields = config.enabledFields;
 
+			// Get all field definitions (built-in + extension)
+			const allFieldDefs = await Plugin.getFields();
+
 			// Filter to only return enabled fields
 			const filteredData = {};
-			for (const field of Plugin.allFields) {
-				if (enabledFields[field]) {
-					filteredData[field] = categoryData[field] !== undefined ? categoryData[field] : '';
+			for (const fieldDef of allFieldDefs) {
+				if (enabledFields[fieldDef.key]) {
+					filteredData[fieldDef.key] = categoryData[fieldDef.key] !== undefined ? categoryData[fieldDef.key] : '';
 				}
 			}
 			filteredData.cid = cid;
 			filteredData.name = categoryData.name; // Always include name for display
 			filteredData.icon = categoryData.icon; // Always include icon for display
 
+			// Fire filter hook to let other plugins modify loaded category data
+			let hookPayload = { data: filteredData, cid: cid, uid: uid };
+			hookPayload = await plugins.hooks.fire('filter:moderation-tools.category.load', hookPayload);
+
 			helpers.formatApiResponse(200, res, {
-				category: filteredData,
+				category: hookPayload.data,
 				config: {
 					enabledFields: enabledFields,
 					enabledSidebarActions: config.enabledSidebarActions,
@@ -327,11 +411,21 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			const config = await Plugin.getConfig();
 			const enabledFields = config.enabledFields;
 
+			// Get all field definitions (built-in + extension)
+			const allFieldDefs = await Plugin.getFields();
+			const builtinKeys = new Set(Plugin.allFields);
+
 			// Filter submitted data to only include enabled fields
 			const updateData = {};
-			for (const field of Plugin.allFields) {
-				if (enabledFields[field] && req.body.hasOwnProperty(field)) {
-					updateData[field] = req.body[field];
+			const extensionData = {};
+			for (const fieldDef of allFieldDefs) {
+				if (enabledFields[fieldDef.key] && req.body.hasOwnProperty(fieldDef.key)) {
+					if (builtinKeys.has(fieldDef.key)) {
+						updateData[fieldDef.key] = req.body[fieldDef.key];
+					} else {
+						// Extension fields: collect separately, don't pass to categories.update
+						extensionData[fieldDef.key] = req.body[fieldDef.key];
+					}
 				}
 			}
 
@@ -428,12 +522,23 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			}
 
 			// Save using NodeBB's built-in categories.update
-			if (Object.keys(updateData).length === 0) {
+			const updatedKeys = Object.keys(updateData);
+			if (updatedKeys.length === 0 && Object.keys(extensionData).length === 0) {
 				return helpers.formatApiResponse(200, res, { cid: cid, updated: [] });
 			}
-			await categories.update({ [cid]: updateData });
 
-			helpers.formatApiResponse(200, res, { cid: cid, updated: Object.keys(updateData) });
+			if (updatedKeys.length > 0) {
+				await categories.update({ [cid]: updateData });
+			}
+
+			// Fire action hook after successful save (includes both built-in and extension data)
+			await plugins.hooks.fire('action:moderation-tools.category.save', {
+				data: Object.assign({}, updateData, extensionData),
+				cid: cid,
+				uid: uid,
+			});
+
+			helpers.formatApiResponse(200, res, { cid: cid, updated: updatedKeys.concat(Object.keys(extensionData)) });
 		} catch (err) {
 			helpers.formatApiResponse(500, res, Plugin.safeApiError(err));
 		}
@@ -452,7 +557,12 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			}
 
 			const config = await Plugin.getConfig();
-			helpers.formatApiResponse(200, res, config);
+			const allFieldDefs = await Plugin.getFields();
+			helpers.formatApiResponse(200, res, {
+				enabledFields: config.enabledFields,
+				enabledSidebarActions: config.enabledSidebarActions,
+				fields: allFieldDefs,
+			});
 		} catch (err) {
 			helpers.formatApiResponse(500, res, Plugin.safeApiError(err));
 		}
@@ -564,13 +674,12 @@ Plugin.renderModerationPage = async function (req, res, next) {
  */
 Plugin.renderAdminPage = async function (req, res, next) {
 	try {
-		console.log('[moderation-tools] renderAdminPage: allFields =', JSON.stringify(Plugin.allFields));
+		const allFieldDefs = await Plugin.getFields();
+		console.log('[moderation-tools] renderAdminPage: allFieldDefs =', JSON.stringify(allFieldDefs.map(function (f) { return f.key; })));
 		console.log('[moderation-tools] renderAdminPage: sidebarActions =', JSON.stringify(Plugin.sidebarActions));
 		res.render('admin/plugins/moderation-tools', {
 		title: '[[moderation-tools:admin.title]]',
-		allFields: Plugin.allFields.map(function (field) {
-			return { name: field };
-		}),
+		allFields: allFieldDefs,
 		sidebarActions: Plugin.sidebarActions.map(function (action) {
 			return { name: action };
 		}),

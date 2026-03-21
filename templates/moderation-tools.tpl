@@ -62,6 +62,11 @@
 			<div id="moderation-tools-form-container" class="hidden">
 				<form id="moderation-tools-form" class="moderation-tools-form">
 
+					<!-- Core Fields Group -->
+					<h6 class="moderation-tools-group-header fw-bold text-muted text-uppercase mb-3">
+						<i class="fa fa-cog me-1"></i> [[moderation-tools:group.core]]
+					</h6>
+
 					<!-- Name -->
 					<div class="mb-3 moderation-tools-field" data-field="name">
 						<label class="form-label" for="mt-name">[[moderation-tools:fields.name]]</label>
@@ -196,6 +201,9 @@
 						<label class="form-label" for="mt-class">[[moderation-tools:fields.class]]</label>
 						<input id="mt-class" type="text" class="form-control" data-name="class" />
 					</div>
+
+					<!-- Extension Fields Container (populated dynamically by JS) -->
+					<div id="moderation-tools-extension-fields"></div>
 				</form>
 			</div>
 		</div>

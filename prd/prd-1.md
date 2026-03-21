@@ -180,15 +180,192 @@
 }
 ```
 
-### 2.3 Widget（小部件）
+### 2.3 插件扩展机制（Hook）
 
-#### 2.3.1 Widget 基本信息
+#### 2.3.1 扩展字段 Hook
+
+本插件提供一个 `filter` 类型 Hook，允许其他 NodeBB 插件向版主管理页面注册自定义管理字段，无需修改本插件源码。
+
+**Hook 名称**: `filter:moderation-tools.fields`
+
+**Hook 类型**: `filter`（修改并返回数据）
+
+**触发时机**: ACP 获取可管理字段列表时，以及前端页面渲染表单时
+
+**传入参数**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `fields` | `Array<FieldDefinition>` | 当前已注册的字段定义数组 |
+
+**返回值**: 修改后的 `fields` 数组
+
+**FieldDefinition 数据结构**:
+
+```typescript
+interface FieldDefinition {
+  // 字段唯一标识，用于 data-name 属性和配置存储，必须全局唯一
+  // 建议格式：{pluginId}:{fieldName}，如 "my-plugin:customField"
+  key: string;
+
+  // 字段显示名称（i18n key 或纯文本）
+  label: string;
+
+  // 字段类型：text | textarea | number | checkbox | select | color | custom
+  type: string;
+
+  // 字段分组（用于在 ACP 和前端页面中分组显示）
+  group?: string;
+
+  // 字段默认值
+  defaultValue?: any;
+
+  // 当 type 为 select 时的选项列表
+  options?: Array<{ value: string; label: string }>;
+
+  // 字段说明文本（i18n key 或纯文本）
+  description?: string;
+
+  // 字段占位符文本
+  placeholder?: string;
+
+  // 自定义渲染模板路径（仅 type 为 custom 时有效）
+  // 模板中可通过 {field} 获取当前字段定义，通过 {value} 获取当前值
+  template?: string;
+
+  // 前端保存时的数据验证函数名称（可选）
+  // 如提供，前端保存前会调用此函数验证数据
+  validator?: string;
+
+  // 前端保存后的回调函数名称（可选）
+  // 如提供，保存成功后会调用此函数执行额外逻辑
+  onSave?: string;
+
+  // 字段排序权重（数值越小越靠前，默认按注册顺序排列）
+  order?: number;
+}
+```
+
+**其他插件使用示例**:
+
+```javascript
+// 在其他插件的 static:app.load 中注册
+plugin.hooks = {};
+
+plugin.hooks.registerFields = async function (hookData) {
+  hookData.fields.push({
+    key: 'my-plugin:customField',
+    label: '[[my-plugin:custom-field-label]]',
+    type: 'text',
+    group: 'custom-fields',
+    defaultValue: '',
+    description: '[[my-plugin:custom-field-desc]]',
+    placeholder: '请输入自定义内容',
+    order: 100,
+  });
+
+  return hookData;
+};
+
+// 注册 hook
+const { hooks } = require.main.require('./src/plugins');
+hooks.register('filter:moderation-tools.fields', plugin.hooks.registerFields);
+```
+
+#### 2.3.2 扩展字段数据 Hook
+
+除了注册字段定义外，本插件还提供数据读写 Hook，使其他插件能够在版主数据加载和保存时参与数据处理。
+
+**1. 读取数据 Hook**
+
+- **Hook 名称**: `filter:moderation-tools.category.load`
+- **Hook 类型**: `filter`
+- **触发时机**: 前端页面加载指定版块数据时
+- **传入参数**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `data` | `object` | 当前版块的已加载数据 |
+| `cid` | `number` | 当前版块 ID |
+| `uid` | `number` | 当前操作用户 ID |
+
+- **返回值**: 修改后的 `data` 对象
+
+**使用示例**:
+
+```javascript
+plugin.hooks.loadCategoryData = async function (hookData) {
+  // 为自定义字段加载额外数据
+  const customValue = await db.getObjectField(`category:${hookData.cid}:custom`, 'customField');
+  hookData.data['my-plugin:customField'] = customValue || '';
+  return hookData;
+};
+
+hooks.register('filter:moderation-tools.category.load', plugin.hooks.loadCategoryData);
+```
+
+**2. 保存数据 Hook**
+
+- **Hook 名称**: `action:moderation-tools.category.save`
+- **Hook 类型**: `action`
+- **触发时机**: 版主保存版块数据成功后
+- **传入参数**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `data` | `object` | 版主提交的数据（已过滤，仅包含已授权字段） |
+| `cid` | `number` | 当前版块 ID |
+| `uid` | `number` | 当前操作用户 ID |
+
+- **返回值**: 无（action 类型 Hook，不处理返回值）
+
+**使用示例**:
+
+```javascript
+plugin.hooks.saveCategoryData = async function (hookData) {
+  if (hookData.data['my-plugin:customField'] !== undefined) {
+    await db.setObjectField(
+      `category:${hookData.cid}:custom`,
+      'customField',
+      hookData.data['my-plugin:customField']
+    );
+  }
+};
+
+hooks.register('action:moderation-tools.category.save', plugin.hooks.saveCategoryData);
+```
+
+#### 2.3.3 扩展字段在 ACP 中的管理
+
+- 通过 `filter:moderation-tools.fields` 注册的字段将自动出现在 ACP 配置页面的「可管理字段配置」列表中
+- 管理员可以像内置字段一样，对这些扩展字段进行启用/禁用配置
+- 扩展字段在配置列表中会显示其 `label` 和注册来源插件名称，便于管理员识别
+- 扩展字段默认状态为**禁用**（`false`），管理员需手动启用
+
+#### 2.3.4 扩展字段在前端页面中的渲染
+
+- 已启用的扩展字段将渲染在版主管理页面的表单中
+- 字段按照 `group` 分组显示，组名使用 i18n 翻译或显示原始文本
+- `type` 为内置类型（text/textarea/number/checkbox/select/color）时，使用本插件的标准表单控件渲染
+- `type` 为 `custom` 时，加载该字段 `template` 指定的模板进行自定义渲染
+- 前端保存时，所有已启用的扩展字段数据一并提交到保存 API
+
+#### 2.3.5 扩展字段安全说明
+
+- 扩展字段数据的读取和写入由注册插件自行负责，本插件不提供持久化存储
+- 扩展字段的保存 Hook（`action:moderation-tools.category.save`）仅在管理员已启用该字段时触发
+- 扩展字段的数据验证建议在注册时通过 `validator` 指定，或在前端保存逻辑中进行
+- 本插件仅负责传递数据，不验证扩展字段的值合法性，数据安全由注册插件保证
+
+### 2.4 Widget（小部件）
+
+#### 2.4.1 Widget 基本信息
 
 - **Widget ID**: `moderation-tools-link`
 - **显示名称**: 版主管理工具
 - **描述**: 显示一个跳转到版主管理页面的链接，仅对有管理权限的用户可见
 
-#### 2.3.2 Widget 功能
+#### 2.4.2 Widget 功能
 
 1. **权限验证**
    - 在 Widget 渲染时检查当前用户是否为管理员（`user.isAdministrator(uid)`）、全局版主（`user.isGlobalModerator(uid)`）或当前分类的版主（`user.isModerator(uid, cid)`）
@@ -204,7 +381,7 @@
    - 支持标准 Widget 配置：标题、容器 HTML、显示/隐藏组、日期范围、移动端隐藏
    - 不需要额外自定义配置项
 
-#### 2.3.3 Widget 适用区域
+#### 2.4.3 Widget 适用区域
 
 适用于所有支持 Widget 的区域，推荐放置在：
 - 全局侧边栏（Global Sidebar）
@@ -246,6 +423,9 @@ nodebb-plugin-moderation-tools/
 | `filter:widgets.getWidgets` | 注册 Widget 定义 |
 | `filter:widget.render:moderation-tools-link` | 渲染 Widget 内容 |
 | `filter:middleware.render` | 向前端模板注入版主权限数据 |
+| `filter:moderation-tools.fields` | 允许其他插件注册自定义管理字段 |
+| `filter:moderation-tools.category.load` | 允许其他插件在加载版块数据时注入自定义字段值 |
+| `action:moderation-tools.category.save` | 允许其他插件在保存版块数据后处理自定义字段 |
 
 ### 3.3 路由设计
 
@@ -344,6 +524,9 @@ nodebb-plugin-moderation-tools/
 - 验证 Widget 在不同分类页面中的权限判断
 - 验证并发保存时的数据一致性
 - 验证边界情况：无版块权限时的空状态展示、版块删除后的处理
+- 验证扩展字段 Hook：其他插件注册的字段能正确出现在 ACP 和前端页面
+- 验证扩展字段的数据读写 Hook：加载和保存时自定义数据正确传递
+- 验证扩展字段在禁用状态下的过滤：禁用的扩展字段不会在前端渲染，保存时不会触发 save Hook
 
 ### 4.6 安全注意事项
 

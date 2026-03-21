@@ -13,15 +13,25 @@
 					</p>
 					<div class="card">
 						<div class="card-body p-0">
-							<div class="list-group list-group-flush">
+							<div class="list-group list-group-flush" id="moderation-tools-fields-list">
 								{{{ each allFields }}}
-								<div class="list-group-item d-flex justify-content-between align-items-center">
-									<div>
-										<strong>[[moderation-tools:fields.{./name}]]</strong>
-										<small class="text-muted d-block"><code>{./name}</code></small>
+								<div class="list-group-item d-flex justify-content-between align-items-center" data-group="{./group}" data-extension="{./isExtension}">
+									<div class="d-flex align-items-start gap-2">
+										<div>
+											<div class="d-flex align-items-center gap-1">
+												<strong>{./label}</strong>
+												{{{ if ./isExtension }}}
+												<span class="badge bg-secondary bg-opacity-75 moderation-tools-extension-badge" title="[[moderation-tools:extension-field-source, {./pluginId}]]">{./pluginId}</span>
+												{{{ end }}}
+											</div>
+											<small class="text-muted d-block"><code>{./key}</code></small>
+											{{{ if ./description }}}
+											<small class="form-text text-muted moderation-tools-field-description">{./description}</small>
+											{{{ end }}}
+										</div>
 									</div>
 									<div class="form-check form-switch mb-0">
-										<input type="checkbox" class="form-check-input" id="enabledFields_{./name}" name="enabledFields_{./name}" />
+										<input type="checkbox" class="form-check-input" id="enabledFields_{./key}" name="enabledFields_{./key}" />
 									</div>
 								</div>
 								{{{ end }}}

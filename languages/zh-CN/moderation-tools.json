@@ -51,6 +51,13 @@
 	"admin.policy-instant": "配置变更即时生效，无需重启。",
 	"admin.save-success": "版主管理工具设置已成功保存。",
 
+	"extension-fields": "扩展字段",
+	"extension-fields-desc": "由其他插件注册的字段",
+	"fields-group-core": "核心字段",
+	"extension-field-source": "来源: %1",
+	"extension-field-template-load-error": "加载自定义字段模板失败",
+	"extension-field-validation-error": "字段 \"%1\" 验证失败: %2",
+
 	"widget.name": "版主管理工具链接",
 	"widget.description": "显示一个跳转到版主管理页面的链接，仅对有管理权限的用户可见。",
 	"widget.label": "版主管理工具"

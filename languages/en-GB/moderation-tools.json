@@ -51,6 +51,13 @@
 	"admin.policy-instant": "Configuration changes take effect immediately without requiring a restart.",
 	"admin.save-success": "Moderation tools settings saved successfully.",
 
+	"extension-fields": "Extension Fields",
+	"extension-fields-desc": "Fields registered by other plugins",
+	"fields-group-core": "Core Fields",
+	"extension-field-source": "Source: %1",
+	"extension-field-template-load-error": "Failed to load custom field template",
+	"extension-field-validation-error": "Field \"%1\" validation failed: %2",
+
 	"widget.name": "Moderation Tools Link",
 	"widget.description": "Displays a link to the moderation tools page, visible only to users with moderation permissions.",
 	"widget.label": "Moderation Tools"
