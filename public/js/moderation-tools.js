@@ -27,7 +27,7 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 			var message = (json.status && json.status.message) || json.message || fallbackMsg;
 			return { message: message };
 		} catch (e) {
-			return { message: fallbackMsg || 'An unexpected error occurred.' };
+			return { message: fallbackMsg };
 		}
 	}
 
@@ -81,10 +81,13 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 	 * Initialize the moderation tools page
 	 */
 	ModerationTools.init = function () {
-		// Guard: only initialize when on the correct page
+        // Guard: only initialize when on the correct page
 		if (!document.getElementById('moderation-tools')) {
 			return;
 		}
+
+		// Clean up any previous initialization to prevent duplicate event handlers
+		ModerationTools._initialized = false;
 
 		var $saveBtn = $('#moderation-tools-save');
 		var $cidSelect = $('#moderation-tools-cid-select');
@@ -245,13 +248,14 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 						+ '</div>';
 					break;
 
-				case 'custom':
-					// Placeholder for custom template - will be loaded after render
-					inputHtml = '<div id="' + fieldId + '-custom" data-name="' + key + '" class="mt-custom-field"'
-						+ (field.template ? ' data-template="' + escapeHtmlAttr(field.template) + '"' : '')
-						+ '>'
-						+ '<span class="text-muted"><i class="fa fa-spinner fa-spin me-1"></i> Loading...</span>'
-						+ '</div>';
+			case 'custom':
+				// Placeholder for custom template - will be loaded after render
+				var loadingText = await ensureText('loading', 'loading');
+				inputHtml = '<div id="' + fieldId + '-custom" data-name="' + key + '" class="mt-custom-field"'
+					+ (field.template ? ' data-template="' + escapeHtmlAttr(field.template) + '"' : '')
+					+ '>'
+					+ '<span class="text-muted"><i class="fa fa-spinner fa-spin me-1"></i> ' + escapeHtmlText(loadingText) + '</span>'
+					+ '</div>';
 					break;
 
 				default:
@@ -320,8 +324,9 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 
 			// Build HTML: separator, then group by group
 			var html = '<hr class="mt-extension-separator" />';
+			var extensionGroupTitle = await translateFieldText('[[moderation-tools:group.extensions]]');
 			html += '<h6 class="moderation-tools-group-header fw-bold text-muted text-uppercase mb-3">'
-				+ '<i class="fa fa-puzzle-piece me-1"></i> [[moderation-tools:group.extensions]]'
+				+ '<i class="fa fa-puzzle-piece me-1"></i> ' + escapeHtmlText(extensionGroupTitle)
 				+ '</h6>';
 
 			for (var g = 0; g < groupOrder.length; g++) {
@@ -359,7 +364,7 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 		function loadCustomTemplate($el) {
 			var templatePath = $el.data('template');
 			if (!templatePath) {
-				$el.html('<span class="text-danger">Custom template path not specified.</span>');
+				$el.html('<span class="text-danger"><i class="fa fa-exclamation-triangle me-1"></i></span>');
 				return;
 			}
 
@@ -384,9 +389,11 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 				} else if (data.template) {
 					templateHtml = data.template;
 				}
-				$el.html(templateHtml || '<span class="text-muted">No template content.</span>');
+				$el.html(templateHtml);
 			}).catch(function () {
-				$el.html('<span class="text-danger">Failed to load custom template.</span>');
+				translateFieldText('[[moderation-tools:extension-field-template-load-error]]').then(function (msg) {
+					$el.html('<span class="text-danger">' + escapeHtmlText(msg) + '</span>');
+				});
 			});
 		}
 
@@ -417,6 +424,11 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 		 */
 		async function validateExtensionFields(formData) {
 			var fields = getEnabledExtensionFieldDefs();
+			async function translateErrorMsg(i18nKey, param) {
+				var lang = (config && config.userLang) || 'en-GB';
+				var fullKey = i18nKey.replace('%1', param);
+				return translator.translate(fullKey, lang);
+			}
 			for (var i = 0; i < fields.length; i++) {
 				var field = fields[i];
 				if (field.validator && formData.hasOwnProperty(field.key)) {
@@ -431,7 +443,7 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 							if (result === false) {
 								return {
 									valid: false,
-									message: '[[moderation-tools:extension-validation-failed, ' + (field.label || field.key) + ']]',
+									message: await translateErrorMsg('[[moderation-tools:extension-validation-failed, %1]]', field.label || field.key),
 								};
 							}
 							if (typeof result === 'string') {
@@ -440,13 +452,13 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 							if (result && typeof result === 'object' && !result.valid) {
 								return {
 									valid: false,
-									message: result.message || '[[moderation-tools:extension-validation-failed, ' + (field.label || field.key) + ']]',
+									message: result.message || await translateErrorMsg('[[moderation-tools:extension-validation-failed, %1]]', field.label || field.key),
 								};
 							}
 						} catch (err) {
 							return {
 								valid: false,
-								message: '[[moderation-tools:extension-validator-error, ' + (field.label || field.key) + ']]',
+								message: await translateErrorMsg('[[moderation-tools:extension-validator-error, %1]]', field.label || field.key),
 							};
 						}
 					}
@@ -753,8 +765,8 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 			}
 		}
 
-		// Event: category selector change (with unsaved changes confirmation)
-		$cidSelect.on('change', function () {
+        // Event: category selector change (with unsaved changes confirmation)
+		$cidSelect.off('change.moderationTools').on('change.moderationTools', function () {
 			var newCid = parseInt($(this).val(), 10) || null;
 			if (hasChanges) {
 				var unsavedStr = text.unsavedChanges || 'You have unsaved changes. Are you sure you want to leave?';
@@ -770,25 +782,25 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 			}
 		});
 
-		// Event: save button click
-		$saveBtn.on('click', function () {
+        // Event: save button click
+		$saveBtn.off('click.moderationTools').on('click.moderationTools', function () {
 			if (currentCid) {
 				saveCategoryData();
 			}
 		});
 
-		// Event: track form changes for unsaved indicator
-		$form.on('change input', '[data-name]', function () {
+        // Event: track form changes for unsaved indicator
+		$form.off('change.moderationTools input.moderationTools').on('change.moderationTools input.moderationTools', '[data-name]', function () {
 			checkChanges();
 		});
 
-		// Color picker sync: color swatch updates text input and vice versa
-		$form.on('input change', '.mt-color-preview', function () {
+        // Color picker sync: color swatch updates text input and vice versa
+		$form.off('input.moderationTools change.moderationTools').on('input.moderationTools change.moderationTools', '.mt-color-preview', function () {
 			var targetId = $(this).data('target');
 			var $textInput = $('#' + targetId);
 			$textInput.val($(this).val()).trigger('change');
 		});
-		$form.on('input change', '[data-name="bgColor"], [data-name="color"]', function () {
+		$form.off('input.moderationTools change.moderationTools').on('input.moderationTools change.moderationTools', '[data-name="bgColor"], [data-name="color"]', function () {
 			var val = $(this).val();
 			var $preview = $(this).closest('.d-flex').find('.mt-color-preview');
 			if (val && /^#[0-9a-fA-F]{6}$/.test(val)) {
@@ -818,6 +830,8 @@ define('moderation-tools', ['jquery', 'translator', 'alerts'], function ($, tran
 				$empty.removeClass('hidden');
 			}
 		});
+
+		ModerationTools._initialized = true;
 	};
 
 	return ModerationTools;

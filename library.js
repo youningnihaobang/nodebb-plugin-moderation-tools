@@ -87,6 +87,20 @@ Plugin.getFields = async function () {
 		}
 	}
 
+	// Blocklist of NodeBB internal category properties that extension fields must not collide with
+	const reservedKeys = new Set([
+		'cid', 'disabled', 'slug', 'order', 'icon', 'descriptionParsed',
+		'parentCid', 'name', 'key', 'lagacy', 'post_count', 'topic_count',
+		'totalPostCount', 'totalTopicCount', 'recentPosts',
+	]);
+	result.fields = result.fields.filter(function (field) {
+		if (field.isExtension && reservedKeys.has(field.key)) {
+			winston.warn('[plugins/moderation-tools] Extension field "' + field.key + '" uses a reserved key and has been ignored.');
+			return false;
+		}
+		return true;
+	});
+
 	// Sort by order property (ascending), extensions without order go last
 	result.fields.sort(function (a, b) {
 		const orderA = a.order !== undefined ? a.order : Infinity;
@@ -372,11 +386,13 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			let hookPayload = { data: filteredData, cid: cid, uid: uid };
 			hookPayload = await plugins.hooks.fire('filter:moderation-tools.category.load', hookPayload);
 
+			const extensionFields = allFieldDefs.filter(function (f) { return f.isExtension; });
 			helpers.formatApiResponse(200, res, {
 				category: hookPayload.data,
 				config: {
 					enabledFields: enabledFields,
 					enabledSidebarActions: config.enabledSidebarActions,
+					extensionFields: extensionFields,
 				},
 			});
 		} catch (err) {
@@ -552,7 +568,7 @@ Plugin.addApiRoutes = async function ({ router, middleware, helpers }) {
 			const isGlobalMod = await user.isGlobalModerator(uid);
 			const isModerator = isAdmin || isGlobalMod || await user.isModeratorOfAnyCategory(uid);
 
-			if (!isModerator) {
+			if (!isAdmin && !isGlobalMod) {
 				return helpers.formatApiResponse(403, res, new Error('[[error:no-privileges]]'));
 			}
 
@@ -590,11 +606,13 @@ Plugin.renderModerationPage = async function (req, res, next) {
 	}
 
 	// Parallelize independent data fetches
-	const [pluginConfig, userSettings] = await Promise.all([
+	const [pluginConfig, userSettings, allFieldDefs] = await Promise.all([
 		Plugin.getConfig(),
 		user.getSettings(uid),
+		Plugin.getFields(),
 	]);
 	const config = pluginConfig;
+	const extensionFields = allFieldDefs.filter(function (f) { return f.isExtension; });
 
 	// Translate strings for JS use and pass via ajaxify.data
 	const userLang = userSettings.userLang || meta.config.defaultLang || 'en-GB';
@@ -649,7 +667,7 @@ Plugin.renderModerationPage = async function (req, res, next) {
 		breadcrumb: breadcrumb,
 		categories: validCategories,
 		initialCid: initialCid || (validCategories.length > 0 ? validCategories[0].cid : null),
-		config: config,
+		config: Object.assign({}, config, { extensionFields: extensionFields }),
 		isAdmin: isAdmin,
 		isGlobalMod: isGlobalMod,
 		// Pass translated strings for client-side JS
@@ -675,11 +693,24 @@ Plugin.renderModerationPage = async function (req, res, next) {
 Plugin.renderAdminPage = async function (req, res, next) {
 	try {
 		const allFieldDefs = await Plugin.getFields();
-		console.log('[moderation-tools] renderAdminPage: allFieldDefs =', JSON.stringify(allFieldDefs.map(function (f) { return f.key; })));
-		console.log('[moderation-tools] renderAdminPage: sidebarActions =', JSON.stringify(Plugin.sidebarActions));
+
+		// Translate field labels and descriptions for ACP display
+		const userSettings = await user.getSettings(req.uid);
+		const userLang = userSettings.userLang || meta.config.defaultLang || 'en-GB';
+		const translatedFields = await Promise.all(allFieldDefs.map(async function (field) {
+			const translated = Object.assign({}, field);
+			if (translated.label) {
+				translated.label = await translator.translate('[[' + translated.label + ']]', userLang);
+			}
+			if (translated.description) {
+				translated.description = await translator.translate('[[' + translated.description + ']]', userLang);
+			}
+			return translated;
+		}));
+
 		res.render('admin/plugins/moderation-tools', {
 		title: '[[moderation-tools:admin.title]]',
-		allFields: allFieldDefs,
+		allFields: translatedFields,
 		sidebarActions: Plugin.sidebarActions.map(function (action) {
 			return { name: action };
 		}),
@@ -708,15 +739,15 @@ Plugin.addAdminNavigation = async function (header) {
  * Ensures new installations have correct default values ('on'/'off')
  */
 Plugin.getAdminSettings = async function (hookData) {
-	console.log('[moderation-tools] getAdminSettings hook fired, plugin:', hookData.plugin);
+	winston.verbose('[moderation-tools] getAdminSettings hook fired, plugin: ' + hookData.plugin);
 	if (hookData.plugin === 'moderation-tools') {
-		console.log('[moderation-tools] getAdminSettings incoming values:', JSON.stringify(hookData.values));
-		console.log('[moderation-tools] getAdminSettings defaults:', JSON.stringify(Plugin.settingsDefaults));
+		winston.verbose('[moderation-tools] getAdminSettings incoming values: ' + JSON.stringify(hookData.values));
+		winston.verbose('[moderation-tools] getAdminSettings defaults: ' + JSON.stringify(Plugin.settingsDefaults));
 		hookData.values = {
 			...Plugin.settingsDefaults,
 			...hookData.values,
 		};
-		console.log('[moderation-tools] getAdminSettings merged values:', JSON.stringify(hookData.values));
+		winston.verbose('[moderation-tools] getAdminSettings merged values: ' + JSON.stringify(hookData.values));
 	}
 	return hookData;
 };

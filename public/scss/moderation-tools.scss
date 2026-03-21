@@ -125,3 +125,14 @@
 		box-shadow: 0 0 0 6px rgba(255, 193, 7, 0);
 	}
 }
+
+/* Respect user's reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+	#moderation-tools {
+		.moderation-tools-header {
+			.btn-warning {
+				animation: none;
+			}
+		}
+	}
+}
